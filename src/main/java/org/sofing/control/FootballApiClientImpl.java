@@ -9,7 +9,8 @@ import java.util.Scanner;
 public class FootballApiClientImpl {
     String apiKey = "f9baa6b41aa2db169d13361b5e2a1c4e";
     String apiUrl = "https://v3.football.api-sports.io/fixtures?date=2025-03-22";
-    {
+
+    public void footballApiRequest() {
         try {
             URL url = new URL(apiUrl);
             HttpURLConnection connection;
@@ -22,14 +23,6 @@ public class FootballApiClientImpl {
             int responseCode = connection.getResponseCode();
             if (responseCode != 200) {
                 throw new RuntimeException("HttpResponseCode: " + responseCode);
-            } else {
-                StringBuilder response = new StringBuilder();
-                Scanner scanner = new Scanner(connection.getInputStream());
-                while (scanner.hasNext()) {
-                    response.append(scanner.nextLine());
-                }
-                scanner.close();
-                System.out.println(response.toString());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
