@@ -1,38 +1,39 @@
 package org.sofing.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class Match {
-    private String team1;
-    private String team2;
+    private List<String> teams;
+    private List<String> dateTimes;
     private String field;
     private String referee;
-    private LocalDateTime dateTime;
     private String league;
+    private List<Double> odds;
 
-    public Match(String team1, String team2, String field, LocalDateTime dateTime, String league, String referee) {
-        this.team1 = team1;
-        this.team2 = team2;
+    public Match(List<String> teams, List<String> dateTimes, String field, String referee, String league, List<Double> odds) {
+        this.teams = teams;
+        this.dateTimes = dateTimes;
         this.field = field;
-        this.dateTime = dateTime;
-        this.league = league;
         this.referee = referee;
+        this.league = league;
+        this.odds = odds;
     }
 
-    public String getTeam1() {
-        return team1;
+    public List<String> getTeams() {
+        return teams;
     }
 
-    public void setTeam1(String team1) {
-        this.team1 = team1;
+    public void setTeams(List<String> teams) {
+        this.teams = teams;
     }
 
-    public String getTeam2() {
-        return team2;
+    public List<String> getDateTimes() {
+        return dateTimes;
     }
 
-    public void setTeam2(String team2) {
-        this.team2 = team2;
+    public void setDateTimes(List<String> dateTimes) {
+        this.dateTimes = dateTimes;
     }
 
     public String getField() {
@@ -51,14 +52,6 @@ public class Match {
         this.referee = referee;
     }
 
-    public LocalDateTime getDateTime() {
-        return dateTime;
-    }
-
-    public void setDateTime(LocalDateTime dateTime) {
-        this.dateTime = dateTime;
-    }
-
     public String getLeague() {
         return league;
     }
@@ -66,4 +59,13 @@ public class Match {
     public void setLeague(String league) {
         this.league = league;
     }
+
+    public List<Double> getOdds() {
+        return odds;
+    }
+
+    public void setOdds(List<Double> odds) {
+        this.odds = odds;
+    }
 }
+
