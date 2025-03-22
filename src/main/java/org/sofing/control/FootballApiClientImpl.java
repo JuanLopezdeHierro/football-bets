@@ -7,10 +7,11 @@ import java.net.URL;
 import java.util.Scanner;
 
 public class FootballApiClientImpl {
-    String apiKey = "f9baa6b41aa2db169d13361b5e2a1c4e";
-    String apiUrl = "https://v3.football.api-sports.io/fixtures?date=2025-03-22";
+    public void apiSportsRequest() {
 
-    public void footballApiRequest() {
+        String apiKey = "f9baa6b41aa2db169d13361b5e2a1c4e";
+        String apiUrl = "https://v3.football.api-sports.io/teams?name=Las%20Palmas";
+
         try {
             URL url = new URL(apiUrl);
             HttpURLConnection connection;
@@ -24,8 +25,13 @@ public class FootballApiClientImpl {
             if (responseCode != 200) {
                 throw new RuntimeException("HttpResponseCode: " + responseCode);
             }
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void urlConstructor() {
+
     }
 }
