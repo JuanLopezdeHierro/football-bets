@@ -28,24 +28,42 @@ public class FootballWebScraping {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return new Match(teams, dateTimes, null, null, null, odds);
+        return new Match(teams, dateTimes, new ArrayList<>(), "", "", odds);
     }
 
     private void extractTeamsAndDateTimes(Document connection, List<String> teams, List<String> dateTimes) {
         List<Element> teamElements = connection.select("span.team-name");
         List<Element> dateTimeElements = connection.select("span.date.ui-countdown");
+        List<Element> inPlayElements = connection.select("span.event-inplay-state.inplay.ui-time-stop-format");
 
         for (int i = 0; i < teamElements.size(); i += 2) {
             teams.add(getTeamName(teamElements.get(i)));
             teams.add(getTeamName(teamElements.get(i + 1)));
-            dateTimes.add(getDateTime(dateTimeElements.get(i / 2)));
+
+            int matchIndex = i / 2; // Índice del partido en la lista
+
+            // Si el partido está en curso, usa inPlayElements
+            if (matchIndex < inPlayElements.size()) {
+                dateTimes.add(getInPlayTime(inPlayElements.get(matchIndex)));
+            }
+            // Si no está en curso, usa dateTimeElements (fecha programada)
+            else if (matchIndex < dateTimeElements.size()) {
+                dateTimes.add(getDateTime(dateTimeElements.get(matchIndex)));
+            }
+            // Si no hay información, asigna "N/A"
+            else {
+                dateTimes.add("N/A");
+            }
         }
+    }
+    private String getInPlayTime(Element inPlayElement) {
+        return inPlayElement.text();
     }
 
     private void extractOdds(Document connection, List<Double> odds) {
         List<Element> oddsElements = connection.select("span.ui-runner-price.ui-display-decimal-price");
 
-        for (int i = 0; i < oddsElements.size(); i += 5) {
+        for (int i = 0; i + 4 < oddsElements.size(); i += 5) {
             odds.add(getOdds(oddsElements.get(i + 2)));
             odds.add(getOdds(oddsElements.get(i + 3)));
             odds.add(getOdds(oddsElements.get(i + 4)));

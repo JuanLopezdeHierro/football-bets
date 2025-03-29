@@ -14,10 +14,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static javax.swing.UIManager.put;
-
 public class FootballApiClientImpl {
-    String apiUrl = "https://v3.football.api-sports.io/teams?name=";
+    String apiUrl = "https://v3.football.api-sports.io/teams?country=Spain";
+    FootballWebScraping footballWebScraping = new FootballWebScraping();
 
     private static final Map<String, String> TEAM_NAME_MAPPING = new HashMap<>() {{
         put("FC Barcelona", "Barcelona");
@@ -42,35 +41,51 @@ public class FootballApiClientImpl {
         put("Leganés", "Leganes");
     }};
 
-    public List<String> getMatchFields() {
+    public void updateMatchFields(Match match) {
         String apiKey = "f9baa6b41aa2db169d13361b5e2a1c4e";
         List<String> fields = new ArrayList<>();
-        List<String> urls = urlsConstructor();
 
-        for (String urlStr : urls) {
-            try {
-                URL url = new URL(urlStr);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestProperty("x-rapidapi-host", "v3.football.api-sports.io");
-                connection.setRequestProperty("x-rapidapi-key", apiKey);
-                connection.setRequestMethod("GET");
-                connection.connect();
+        try {
+            URL url = new URL(apiUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestProperty("x-rapidapi-host", "v3.football.api-sports.io");
+            connection.setRequestProperty("x-rapidapi-key", apiKey);
+            connection.setRequestMethod("GET");
+            connection.connect();
 
-                int responseCode = connection.getResponseCode();
-                if (responseCode == 200) {
-                    JSONArray responseArray = getObjects(connection);
-                    if (!responseArray.isEmpty()) {
-                        JSONObject venue = responseArray.getJSONObject(0).getJSONObject("venue");
-                        fields.add(venue.getString("name"));
-                    }
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) {
+                JSONArray responseArray = getObjects(connection);
+                if (!responseArray.isEmpty()) {
+                    List<String> teams = match.getTeams();
+                    fields.addAll(fileSearcher(teams, responseArray));
+                    match.setFields(fields);
                 }
+            }
 
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<String> fileSearcher(List<String> teams, JSONArray responseArray) {
+        List<String> matchFields = new ArrayList<>();
+        for (int i = 0; i < teams.size(); i += 2) {
+            String teamName = teams.get(i);
+            String teamNameNormalized = TEAM_NAME_MAPPING.getOrDefault(teamName, teamName);
+
+            for (int j = 0; j < responseArray.length(); j++) {
+                JSONObject teamObj = responseArray.getJSONObject(j).getJSONObject("team");
+                String apiTeamName = teamObj.getString("name");
+
+                if (apiTeamName.equalsIgnoreCase(teamNameNormalized)) {
+                    JSONObject venue = responseArray.getJSONObject(j).getJSONObject("venue");
+                    matchFields.add(venue.getString("name"));
+                    break;
+                }
             }
         }
-
-        return fields;
+        return matchFields;
     }
 
     private static JSONArray getObjects(HttpURLConnection connection) throws IOException {
@@ -84,19 +99,5 @@ public class FootballApiClientImpl {
 
         JSONObject jsonResponse = new JSONObject(content.toString());
         return jsonResponse.getJSONArray("response");
-    }
-    public List<String> urlsConstructor() {
-        FootballWebScraping footballWebScraping = new FootballWebScraping();
-        Match scrapingResult = footballWebScraping.betfairScraping();
-        List<String> teams = scrapingResult.getTeams();
-        List<String> urls = new ArrayList<>();
-
-        for (int i = 0; i < teams.size(); i += 2) {
-            String teamName = teams.get(i);
-            String normalizedName = TEAM_NAME_MAPPING.getOrDefault(teamName, teamName);
-            normalizedName = normalizedName.replace(" ", "%20");
-            urls.add(apiUrl + normalizedName);
-        }
-        return urls;
     }
 }

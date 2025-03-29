@@ -6,15 +6,15 @@ import java.util.List;
 public class Match {
     private List<String> teams;
     private List<String> dateTimes;
-    private String field;
+    private List<String> fields;
     private String referee;
     private String league;
     private List<Double> odds;
 
-    public Match(List<String> teams, List<String> dateTimes, String field, String referee, String league, List<Double> odds) {
+    public Match(List<String> teams, List<String> dateTimes, List<String> fields, String referee, String league, List<Double> odds) {
         this.teams = teams;
         this.dateTimes = dateTimes;
-        this.field = field;
+        this.fields = fields;
         this.referee = referee;
         this.league = league;
         this.odds = odds;
@@ -36,13 +36,11 @@ public class Match {
         this.dateTimes = dateTimes;
     }
 
-    public String getField() {
-        return field;
+    public List<String> getField() {
+        return fields;
     }
 
-    public void setField(String field) {
-        this.field = field;
-    }
+    public void setFields(List<String> fields) {this.fields = fields;}
 
     public String getReferee() {
         return referee;
