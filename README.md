@@ -12,8 +12,8 @@ This project performs football data scraping and combines it with data obtained 
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/your-username/your-repository.git
-    cd your-repository
+    git clone https://github.com/JuanLopezdeHierro/football-bets.git
+    cd football-bets
     ```
 
 2. Build the project using Maven:
