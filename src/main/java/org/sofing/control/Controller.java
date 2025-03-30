@@ -7,15 +7,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class Controller {
-    private final FootballWebScraping footballWebScraping;
+    private final FootballWebScrapingImpl footballWebScraping;
     private final FootballApiClientImpl footballApiClient;
-    private final DataStorage dataStorage;
+    private final DataStorageImpl dataStorage;
     private final ScheduledExecutorService scheduler;
 
     public Controller(String apiKey) {
-        this.footballWebScraping = new FootballWebScraping();
+        this.footballWebScraping = new FootballWebScrapingImpl();
         this.footballApiClient = new FootballApiClientImpl(apiKey);
-        this.dataStorage = new DataStorage();
+        this.dataStorage = new DataStorageImpl();
         this.scheduler = Executors.newScheduledThreadPool(1);
     }
 

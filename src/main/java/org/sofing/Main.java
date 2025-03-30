@@ -13,7 +13,6 @@ public class Main {
         Controller controller = new Controller(apiKey);
         controller.start();
 
-        // Agregar un shutdown hook para detener el scheduler al finalizar la aplicación
         Runtime.getRuntime().addShutdownHook(new Thread(controller::stop));
     }
 }
