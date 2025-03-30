@@ -1,21 +1,19 @@
 package org.sofing;
 
-import org.sofing.control.DataStorage;
-import org.sofing.control.FootballApiClientImpl;
-import org.sofing.control.FootballWebScraping;
-import org.sofing.model.Match;
+import org.sofing.control.Controller;
+
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        FootballWebScraping footballWebScraping = new FootballWebScraping();
-        Match match = footballWebScraping.betfairScraping();
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Por favor, introduce tu API key: ");
+        String apiKey = scanner.nextLine();
 
-        FootballApiClientImpl footballApiClient = new FootballApiClientImpl();
-        footballApiClient.updateMatchFields(match);
+        Controller controller = new Controller(apiKey);
+        controller.start();
 
-        DataStorage dataStorage = new DataStorage();
-        dataStorage.insertMatch(match);
-
-        System.out.println("Datos guardados en la base de datos.");
+        // Agregar un shutdown hook para detener el scheduler al finalizar la aplicación
+        Runtime.getRuntime().addShutdownHook(new Thread(controller::stop));
     }
 }

@@ -15,8 +15,9 @@ import java.util.List;
 import java.util.Map;
 
 public class FootballApiClientImpl {
-    String apiUrl = "https://v3.football.api-sports.io/teams?country=Spain";
-    FootballWebScraping footballWebScraping = new FootballWebScraping();
+    private final String apiUrl = "https://v3.football.api-sports.io/teams?country=Spain";
+    private final String apiKey;
+    private final FootballWebScraping footballWebScraping = new FootballWebScraping();
 
     private static final Map<String, String> TEAM_NAME_MAPPING = new HashMap<>() {{
         put("FC Barcelona", "Barcelona");
@@ -41,8 +42,11 @@ public class FootballApiClientImpl {
         put("Leganés", "Leganes");
     }};
 
+    public FootballApiClientImpl(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
     public void updateMatchFields(Match match) {
-        String apiKey = "f9baa6b41aa2db169d13361b5e2a1c4e";
         List<String> fields = new ArrayList<>();
 
         try {

@@ -35,9 +35,9 @@ public class DataStorage {
                 + " field TEXT,\n"
                 + " referee TEXT,\n"
                 + " league TEXT,\n"
-                + " oddHomeTeam REAL,\n"  // Añadir coma aquí
-                + " oddDraw REAL,\n"      // Añadir coma aquí
-                + " oddAwayTeam REAL\n"   // Añadir coma aquí
+                + " oddHomeTeam REAL,\n"
+                + " oddDraw REAL,\n"
+                + " oddAwayTeam REAL\n"
                 + ");";
 
         try (Connection conn = DriverManager.getConnection(DB_URL);
@@ -48,7 +48,21 @@ public class DataStorage {
         }
     }
 
+    private void dropMatchTable() {
+        String sql = "DROP TABLE IF EXISTS matches";
+
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.execute();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
     public void insertMatch(Match match) {
+        dropMatchTable();
+        createMatchTable();
+
         String sql = "INSERT INTO matches(team1, team2, dateTime, field, referee, league, oddHomeTeam, oddDraw, oddAwayTeam) VALUES(?,?,?,?,?,?,?,?,?)";
 
         try (Connection conn = DriverManager.getConnection(DB_URL);
