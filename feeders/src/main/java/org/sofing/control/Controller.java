@@ -1,5 +1,6 @@
 package org.sofing.control;
 
+import jakarta.jms.JMSException;
 import org.sofing.model.Match;
 
 import java.util.concurrent.Executors;
@@ -9,13 +10,13 @@ import java.util.concurrent.TimeUnit;
 public class Controller {
     private final FootballWebScrapingImpl footballWebScraping;
     private final FootballApiClientImpl footballApiClient;
-    private final DataStorageImpl dataStorage;
+    private final EventProvider eventProvider;
     private final ScheduledExecutorService scheduler;
 
     public Controller(String apiKey) {
         this.footballWebScraping = new FootballWebScrapingImpl();
         this.footballApiClient = new FootballApiClientImpl(apiKey);
-        this.dataStorage = new DataStorageImpl();
+        this.eventProvider = new EventProvider();
         this.scheduler = Executors.newScheduledThreadPool(1);
     }
 
@@ -23,11 +24,15 @@ public class Controller {
         Runnable task = () -> {
             Match match = footballWebScraping.betfairScraping();
             footballApiClient.updateMatchFields(match);
-            dataStorage.insertMatch(match);
-            System.out.println("Datos guardados en la base de datos.");
+            try {
+                eventProvider.matchInfoArray(footballWebScraping.matchDataToJson(match));
+            } catch (JMSException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("Datos enviados al topic de ActiveMQ.");
         };
 
-        scheduler.scheduleAtFixedRate(task, 0, 10, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(task, 0, 10, TimeUnit.SECONDS);
     }
 
     public void stop() {
