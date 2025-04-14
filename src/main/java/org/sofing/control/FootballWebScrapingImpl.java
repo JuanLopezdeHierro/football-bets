@@ -1,5 +1,6 @@
 package org.sofing.control;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -36,21 +37,28 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
     }
 
     @Override
-    public JSONObject matchDataToJson(Match match) {
-        JSONObject jsonObject = new JSONObject();
-        for (int i = 0; i < match.getTeams().size(); i+=2) {
+    public JSONArray matchDataToJson(Match match) {
+        JSONArray jsonArray = new JSONArray();
+        List<String> teams = match.getTeams();
+        List<Double> odds = match.getOdds();
+
+        for (int i = 0; i < teams.size(); i += 2) {
+            JSONObject jsonObject = new JSONObject();
             jsonObject.put("timeStamp", Instant.now().toString());
             jsonObject.put("source", "Betfair");
-            jsonObject.put("teamHome", match.getTeams().get(i));
-            jsonObject.put("teamAway", match.getTeams().get(i + 1));
+            jsonObject.put("teamHome", teams.get(i));
+            jsonObject.put("teamAway", teams.get(i + 1));
+
+            int oddsIndex = (i / 2) * 3;
+            if (oddsIndex + 2 < odds.size()) {
+                jsonObject.put("oddsHome", odds.get(oddsIndex));
+                jsonObject.put("oddsDraw", odds.get(oddsIndex + 1));
+                jsonObject.put("oddsAway", odds.get(oddsIndex + 2));
             }
-        for (int i = 0; i < match.getOdds().size() - 6; i+=3) {
-            jsonObject.put("oddsHome", match.getOdds().get(i));
-            jsonObject.put("oddsDraw", match.getOdds().get(i + 1));
-            jsonObject.put("oddsAway", match.getOdds().get(i + 2));
+            jsonArray.put(jsonObject);
         }
-        return jsonObject;
-        }
+        return jsonArray;
+    }
 
     private void extractTeamsAndDateTimes(Document connection, List<String> teams, List<String> dateTimes) {
         List<Element> teamElements = connection.select("span.team-name");
