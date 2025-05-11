@@ -16,12 +16,12 @@ import java.time.format.DateTimeFormatter;
 public class EventReceiver {
 
     private static String url = "tcp://localhost:61616";
-    private static String subject = "Match_Queue";
+    private static String subject = "Match_Topic";
 
     public static void main(String[] args) throws JMSException {
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
         Connection connection = connectionFactory.createConnection();
-        connection.setClientID("octavio");
+        connection.setClientID("Paco");
         connection.start();
 
         Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);

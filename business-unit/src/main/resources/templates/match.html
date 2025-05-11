@@ -1,0 +1,33 @@
+<!-- business-unit/src/main/resources/templates/match.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalles del Partido</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <ul>
+        <li th:each="match : ${matches}" th:classappend="${match.id == selectedMatch.id} ? 'selected'">
+            <a th:href="@{/match/{id}(id=${match.id})}" th:text="${match.teamHome + ' vs ' + match.teamAway}"></a>
+        </li>
+    </ul>
+</div>
+
+<div class="match-details">
+    <div class="logos">
+        <img th:src="@{/images/logos/{team}.png(team=${selectedMatch.teamHome})}" alt="Local">
+        <span th:text="${selectedMatch.timeStamp}"></span>
+        <img th:src="@{/images/logos/{team}.png(team=${selectedMatch.teamAway})}" alt="Visitante">
+    </div>
+
+    <div class="odds">
+        <div>Local: <span th:text="${selectedMatch.oddsHome}"></span></div>
+        <div>Empate: <span th:text="${selectedMatch.oddsDraw}"></span></div>
+        <div>Visitante: <span th:text="${selectedMatch.oddsAway}"></span></div>
+    </div>
+</div>
+</body>
+</html>

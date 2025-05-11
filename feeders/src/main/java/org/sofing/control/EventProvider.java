@@ -6,7 +6,7 @@ import org.json.JSONArray;
 
 public class EventProvider {
     private static String url = "tcp://localhost:61616";
-    private static String subject = "Match_Queue";
+    private static String subject = "Match_Topic";
 
     public void matchInfoArray(JSONArray jsonArray) throws JMSException {
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
@@ -19,7 +19,8 @@ public class EventProvider {
 
         MessageProducer producer = session.createProducer(destination);
 
-        TextMessage message = session.createTextMessage(jsonArray.toString());
+        String jsonWithBraces = jsonArray.toString().replaceFirst("^\\[", "{").replaceFirst("\\]$", "}");
+        TextMessage message = session.createTextMessage(jsonWithBraces);
         producer.send(message);
 
         System.out.println("Mensaje enviado al topic: " + message.getText());

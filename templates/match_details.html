@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle del Partido</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<div class="page-container">
+    <div class="sidebar">
+        <div class="sidebar-title">GENERAL</div>
+        <ul class="match-list-sidebar">
+            <li th:each="match : ${allMatches}"
+                th:class="${match.id == selectedMatch.id ? 'selected' : ''}">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content" th:if="${selectedMatch}">
+        <div class="match-header">
+            <div class="team-info">
+                <img th:src="@{${homeLogo}}" alt="Logo Local" class="team-logo" onerror="this.src='/images/logos/default.png';"/>
+                <p th:text="${selectedMatch.teamHome}">Equipo Local</p>
+            </div>
+            <div class="match-time-info">
+                <p>HORA</p>
+                <p th:text="${selectedMatch.timeStamp.format(timeFormatter)}">--:--</p>
+            </div>
+            <div class="team-info">
+                <img th:src="@{${awayLogo}}" alt="Logo Visitante" class="team-logo" onerror="this.src='/images/logos/default.png';"/>
+                <p th:text="${selectedMatch.teamAway}">Equipo Visitante</p>
+            </div>
+        </div>
+
+        <div class="odds-container">
+            <div class="odd-box">
+                <span>LOCAL</span>
+                <span class="odd-value" th:text="${selectedMatch.oddsHome}">1.00</span>
+            </div>
+            <div class="odd-box">
+                <span>EMPATE</span>
+                <span class="odd-value" th:text="${selectedMatch.oddsDraw}">1.00</span>
+            </div>
+            <div class="odd-box">
+                <span>VISITANTE</span>
+                <span class="odd-value" th:text="${selectedMatch.oddsAway}">1.00</span>
+            </div>
+        </div>
+        <p class="source-info">Fuente de las cuotas: <span th:text="${selectedMatch.source}"></span></p>
+    </div>
+    <div class="main-content" th:unless="${selectedMatch}">
+        <p>Selecciona un partido para ver los detalles.</p>
+    </div>
+</div>
+</body>
+</html>

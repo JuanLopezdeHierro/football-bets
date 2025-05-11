@@ -1,0 +1,179 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+/* Estilos para matches_overview.html */
+.match-list-container {
+    width: 80%;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.match-list-container h1 {
+    text-align: center;
+    color: #333;
+}
+
+.match-list {
+    list-style: none;
+    padding: 0;
+}
+
+.match-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}
+
+.match-list li a {
+    text-decoration: none;
+    color: #007bff;
+    font-size: 1.2em;
+}
+
+.match-list li a:hover {
+    text-decoration: underline;
+}
+
+
+/* Estilos para match_details.html */
+.page-container {
+    display: flex;
+    height: 100vh; /* Ocupa toda la altura de la ventana */
+}
+
+.sidebar {
+    width: 250px; /* Ancho de la barra lateral */
+    background-color: #e9ecef; /* Un gris claro para la barra lateral */
+    padding: 15px;
+    border-right: 1px solid #ccc;
+    display: flex;
+    flex-direction: column; /* Para alinear el título y la lista verticalmente */
+}
+
+.sidebar-title {
+    writing-mode: vertical-rl; /* Escribe "GENERAL" verticalmente */
+    text-orientation: mixed;
+    transform: rotate(180deg); /* Ajusta la orientación si es necesario */
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #555;
+    text-align: center;
+    margin: 0 auto 20px auto; /* Centra y añade espacio debajo */
+    height: 100px; /* Ajusta según el tamaño del texto */
+}
+
+
+.match-list-sidebar {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* Permite que la lista ocupe el espacio restante */
+    overflow-y: auto; /* Scroll si la lista es muy larga */
+}
+
+.match-list-sidebar li {
+    padding: 8px 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.match-list-sidebar li a {
+    text-decoration: none;
+    color: #333;
+    display: block; /* Para que el enlace ocupe todo el li */
+}
+
+.match-list-sidebar li.selected {
+    background-color: #cccccc; /* Grisáceo para el seleccionado */
+    font-weight: bold;
+}
+
+.match-list-sidebar li:hover:not(.selected) {
+    background-color: #f0f0f0;
+}
+
+
+.main-content {
+    flex-grow: 1; /* El contenido principal ocupa el resto del espacio */
+    padding: 20px;
+    background-color: #ffffff;
+    overflow-y: auto; /* Scroll si el contenido es muy largo */
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.team-info {
+    text-align: center;
+}
+
+.team-logo {
+    width: 100px; /* Tamaño de los logos */
+    height: 100px;
+    object-fit: contain; /* Para que el logo se ajuste sin deformarse */
+    margin-bottom: 10px;
+}
+
+.team-info p {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 5px 0 0 0;
+}
+
+.match-time-info {
+    text-align: center;
+}
+
+.match-time-info p {
+    margin: 5px 0;
+    font-size: 1.1em;
+}
+
+.odds-container {
+    display: flex;
+    justify-content: space-around; /* Distribuye las cajas de cuotas */
+    align-items: center;
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+}
+
+.odd-box {
+    text-align: center;
+    padding: 15px 25px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #fff;
+    min-width: 120px; /* Ancho mínimo para cada caja de cuota */
+}
+
+.odd-box span {
+    display: block;
+}
+
+.odd-box .odd-value {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #007bff; /* Un color para destacar la cuota */
+    margin-top: 5px;
+}
+
+.source-info {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: #777;
+}
