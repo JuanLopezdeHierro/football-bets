@@ -3,6 +3,7 @@ package com.example.businessunit.model;
 import java.time.ZonedDateTime;
 
 public class MatchEventDTO {
+    public ZonedDateTime timeStamp;
     public String dateTime;
     public double oddsDraw;
     public String teamAway;

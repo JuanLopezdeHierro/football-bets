@@ -11,7 +11,7 @@ public class Match {
     private String league;
     private List<Double> odds;
 
-    public Match(List<String> teams, List<String> dateTimes, List<String> fields, String referee, String league, List<Double> odds) {
+    public Match(List<String> teams, List<String> dateTimes, List<Double> odds, List<String> fields, String referee, String league) {
         this.teams = teams;
         this.dateTimes = dateTimes;
         this.fields = fields;

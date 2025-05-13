@@ -31,8 +31,13 @@
                     <p th:text="${selectedMatch.teamHome}">Equipo Local</p>
                 </div>
                 <div class="match-time-info">
-                    <p>HORA</p>
-                    <p th:text="${selectedMatch.dateTime != null ? selectedMatch.dateTime : '--:--'}">--:--</p>
+                    <p th:if="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}">TIEMPO DE JUEGO</p>
+                    <p th:unless="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}">FECHA / HORA</p>
+
+                    <p th:if="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}"
+                       th:text="${selectedMatch.liveTimeDisplay != null ? selectedMatch.liveTimeDisplay : selectedMatch.dateTimeString}"></p>
+                    <p th:unless="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}"
+                       th:text="${selectedMatch.dateTimeString != null ? selectedMatch.dateTimeString : '--:--'}"></p>
                 </div>
                 <div class="team-info">
                     <img th:src="@{${awayLogo}}" th:alt="${selectedMatch.teamAway + ' Logo'}" class="team-logo"

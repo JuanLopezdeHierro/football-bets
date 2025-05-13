@@ -4,22 +4,100 @@
     <meta charset="UTF-8">
     <title>Enfrentamientos LaLiga</title>
     <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
+    <style>
+        /* Estilos básicos para las secciones (puedes moverlos a style.css) */
+        .matches-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .matches-section h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dddddd;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .matches-section h2 span {
+            font-size: 0.6em;
+            font-weight: normal;
+            margin-left: 10px;
+        }
+        .no-matches-message {
+            color: #6c757d;
+            font-style: italic;
+            padding: 10px 0;
+        }
+        .match-list li.live-match a {
+            color: #c82333;
+            font-weight: 600;
+        }
+        .match-list li.live-match .live-indicator {
+            display: inline-block;
+            background-color: #dc3545;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
 </head>
 <body>
 <div class="match-list-container">
-    <h1>Próximos Partidos LaLiga</h1>
-    <ul class="match-list" th:if="${not #lists.isEmpty(matches)}">
-        <li th:each="match : ${matches}">
-            <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
-                <span th:text="${match.teamHome}">Equipo Local</span>
-                VS
-                <span th:text="${match.teamAway}">Equipo Visitante</span>
-            </a>
-        </li>
-    </ul>
-    <div th:if="${#lists.isEmpty(matches)}">
-        <p>No hay partidos disponibles en este momento.</p>
+    <h1>Partidos LaLiga</h1>
+
+    <div class="matches-section live-section">
+        <h2>EN DIRECTO <span style="font-size: 0.7em; color: #dc3545;">(Actualizaciones desde ActiveMQ)</span></h2>
+        <ul class="match-list" th:if="${not #lists.isEmpty(liveMatches)}">
+            <li th:each="match : ${liveMatches}" class="live-match">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
+                    <span th:if="${match.liveTimeDisplay != null}" th:text="' - ' + ${match.liveTimeDisplay}" class="live-indicator"></span>
+                    <span th:if="${match.liveTimeDisplay == null && match.dateTimeString != null}" th:text="' - ' + ${match.dateTimeString}"></span>
+                </a>
+            </li>
+        </ul>
+        <div th:if="${#lists.isEmpty(liveMatches)}" class="no-matches-message">
+            <p>No hay partidos en directo en este momento.</p>
+        </div>
     </div>
+
+    <div class="matches-section upcoming-section">
+        <h2>PRÓXIMOS PARTIDOS <span style="font-size: 0.7em; color: #007bff;">(Desde Datalake/ActiveMQ)</span></h2>
+        <ul class="match-list" th:if="${not #lists.isEmpty(upcomingMatches)}">
+            <li th:each="match : ${upcomingMatches}">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
+                    <span th:if="${match.dateTimeString}" th:text="' - ' + ${match.dateTimeString}"></span>
+                </a>
+            </li>
+        </ul>
+        <div th:if="${#lists.isEmpty(upcomingMatches)}" class="no-matches-message">
+            <p>No hay próximos partidos programados.</p>
+        </div>
+    </div>
+
+    <div class="matches-section historical-section">
+        <h2>HISTORIAL DE PARTIDOS <span style="font-size: 0.7em; color: #6c757d;">(Desde Datalake)</span></h2>
+        <ul class="match-list" th:if="${not #lists.isEmpty(historicalMatches)}">
+            <li th:each="match : ${historicalMatches}">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
+                    <span th:if="${match.dateTimeString}" th:text="' - ' + ${match.dateTimeString}"></span>
+                </a>
+            </li>
+        </ul>
+        <div th:if="${#lists.isEmpty(historicalMatches)}" class="no-matches-message">
+            <p>No hay historial de partidos disponible o no se han cargado.</p>
+        </div>
+    </div>
+
 </div>
 </body>
 </html>
