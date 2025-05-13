@@ -9,13 +9,11 @@ import java.util.concurrent.TimeUnit;
 
 public class Controller {
     private final FootballWebScrapingImpl footballWebScraping;
-    private final FootballApiClientImpl footballApiClient;
     private final EventProvider eventProvider;
     private final ScheduledExecutorService scheduler;
 
-    public Controller(String apiKey) {
+    public Controller() {
         this.footballWebScraping = new FootballWebScrapingImpl();
-        this.footballApiClient = new FootballApiClientImpl(apiKey);
         this.eventProvider = new EventProvider();
         this.scheduler = Executors.newScheduledThreadPool(1);
     }
@@ -23,7 +21,6 @@ public class Controller {
     public void start() {
         Runnable task = () -> {
             Match match = footballWebScraping.betfairScraping();
-            footballApiClient.updateMatchFields(match);
             try {
                 eventProvider.matchInfoArray(footballWebScraping.matchDataToJson(match));
             } catch (JMSException e) {

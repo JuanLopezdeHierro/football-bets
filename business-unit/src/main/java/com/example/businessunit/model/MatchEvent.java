@@ -1,12 +1,13 @@
-package model;
+package com.example.businessunit.model;
 
+import lombok.Getter; // Opcional con Lombok
 import java.time.ZonedDateTime;
-import java.util.Objects;
 import java.util.UUID;
 
+// @Getter // Descomenta si usas Lombok
 public class MatchEvent {
     private final String id;
-    private final ZonedDateTime timeStamp;
+    private final String dateTime;
     private final double oddsDraw;
     private final String teamAway;
     private final double oddsAway;
@@ -14,10 +15,10 @@ public class MatchEvent {
     private final String source;
     private final double oddsHome;
 
-    public MatchEvent(ZonedDateTime timeStamp, double oddsDraw, String teamAway, double oddsAway,
+    public MatchEvent(String dateTime, double oddsDraw, String teamAway, double oddsAway,
                       String teamHome, String source, double oddsHome) {
         this.id = UUID.randomUUID().toString();
-        this.timeStamp = timeStamp;
+        this.dateTime = dateTime;
         this.oddsDraw = oddsDraw;
         this.teamAway = teamAway;
         this.oddsAway = oddsAway;
@@ -26,8 +27,9 @@ public class MatchEvent {
         this.oddsHome = oddsHome;
     }
 
+    // --- Getters ---
     public String getId() { return id; }
-    public ZonedDateTime getTimeStamp() { return timeStamp; }
+    public String getDateTime() { return dateTime; }       // NUEVO GETTER
     public double getOddsDraw() { return oddsDraw; }
     public String getTeamAway() { return teamAway; }
     public double getOddsAway() { return oddsAway; }

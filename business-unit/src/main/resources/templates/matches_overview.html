@@ -8,7 +8,7 @@
 <body>
 <div class="match-list-container">
     <h1>Próximos Partidos LaLiga</h1>
-    <ul class="match-list">
+    <ul class="match-list" th:if="${not #lists.isEmpty(matches)}">
         <li th:each="match : ${matches}">
             <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
                 <span th:text="${match.teamHome}">Equipo Local</span>
@@ -17,6 +17,9 @@
             </a>
         </li>
     </ul>
+    <div th:if="${#lists.isEmpty(matches)}">
+        <p>No hay partidos disponibles en este momento.</p>
+    </div>
 </div>
 </body>
 </html>

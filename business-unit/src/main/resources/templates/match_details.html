@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle del Partido</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<div class="page-container">
+    <div class="sidebar">
+        <div class="sidebar-title">GENERAL</div>
+        <ul class="match-list-sidebar" th:if="${not #lists.isEmpty(allMatches)}">
+            <li th:each="matchItem : ${allMatches}"
+                th:classappend="${selectedMatch != null and matchItem.id == selectedMatch.id} ? 'selected' : ''">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${matchItem.id})}">
+                    <span th:text="${matchItem.teamHome}"></span> VS <span th:text="${matchItem.teamAway}"></span>
+                </a>
+            </li>
+        </ul>
+        <div th:if="${#lists.isEmpty(allMatches)}">
+            <p>No hay partidos para mostrar.</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div th:if="${selectedMatch != null}">
+            <div class="match-header">
+                <div class="team-info">
+                    <img th:src="@{${homeLogo}}" th:alt="${selectedMatch.teamHome + ' Logo'}" class="team-logo"
+                         onerror="this.onerror=null; this.src='/images/logos/default.png';"/>
+                    <p th:text="${selectedMatch.teamHome}">Equipo Local</p>
+                </div>
+                <div class="match-time-info">
+                    <p>HORA</p>
+                    <p th:text="${selectedMatch.dateTime != null ? selectedMatch.dateTime : '--:--'}">--:--</p>
+                </div>
+                <div class="team-info">
+                    <img th:src="@{${awayLogo}}" th:alt="${selectedMatch.teamAway + ' Logo'}" class="team-logo"
+                         onerror="this.onerror=null; this.src='/images/logos/default.png';"/>
+                    <p th:text="${selectedMatch.teamAway}">Equipo Visitante</p>
+                </div>
+            </div>
+
+            <div class="odds-container">
+                <div class="odd-box">
+                    <span>LOCAL</span>
+                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsHome, 1, 2)}">1.00</span>
+                </div>
+                <div class="odd-box">
+                    <span>EMPATE</span>
+                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsDraw, 1, 2)}">1.00</span>
+                </div>
+                <div class="odd-box">
+                    <span>VISITANTE</span>
+                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsAway, 1, 2)}">1.00</span>
+                </div>
+            </div>
+            <p class="source-info">Fuente de las cuotas: <span th:text="${selectedMatch.source}">Betfair</span></p>
+        </div>
+        <div th:if="${selectedMatch == null}">
+            <p th:if="${errorMessage}" th:text="${errorMessage}" class="error-message">Error al cargar el partido.</p>
+            <p th:unless="${errorMessage}">Selecciona un partido de la lista para ver los detalles.</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

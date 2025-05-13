@@ -19,8 +19,7 @@ public class EventProvider {
 
         MessageProducer producer = session.createProducer(destination);
 
-        String jsonWithBraces = jsonArray.toString().replaceFirst("^\\[", "{").replaceFirst("\\]$", "}");
-        TextMessage message = session.createTextMessage(jsonWithBraces);
+        TextMessage message = session.createTextMessage(jsonArray.toString());
         producer.send(message);
 
         System.out.println("Mensaje enviado al topic: " + message.getText());

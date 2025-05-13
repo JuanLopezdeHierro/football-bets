@@ -32,26 +32,21 @@ public class EventReceiver {
             try {
                 String content = ((TextMessage) message).getText();
 
-                // Extraer timestamp y convertirlo a fecha YYYYMMDD
-                long ts = Instant.now().getEpochSecond(); // Aquí puedes usar el timestamp del evento si lo tienes
+                long ts = Instant.now().getEpochSecond();
                 LocalDate date = Instant.ofEpochSecond(ts).atZone(ZoneId.systemDefault()).toLocalDate();
                 String dateString = date.format(DateTimeFormatter.BASIC_ISO_DATE); // YYYYMMDD
 
-                // Obtener nombre del tópico (queue)
                 String topicName = ((Queue) message.getJMSDestination()).getQueueName();
 
-                // Obtener campo "ss" del JSON o valor por defecto
-                String ss = "default"; // Modificar esto según los datos del mensaje
+                String ss = "default";
 
-                // Construir ruta: datalake/eventstore/{topic}/{ss}/{YYYYMMDD}.events
                 Path outputPath = Paths.get("datalake", "eventstore", topicName, ss);
                 Files.createDirectories(outputPath);
                 Path file = outputPath.resolve(dateString + ".events");
 
-                // Escribir una línea (append)
                 Files.writeString(file, content + System.lineSeparator(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 
-                System.out.println("Evento guardado en: " + file.toString());
+                System.out.println("Evento guardado en: " + file);
 
             } catch (JMSException | IOException e) {
                 throw new RuntimeException(e);

@@ -48,6 +48,7 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
             jsonObject.put("source", "Betfair");
             jsonObject.put("teamHome", teams.get(i));
             jsonObject.put("teamAway", teams.get(i + 1));
+            jsonObject.put("dateTime", match.getDateTimes().get(i / 2));
 
             int oddsIndex = (i / 2) * 3;
             if (oddsIndex + 2 < odds.size()) {
