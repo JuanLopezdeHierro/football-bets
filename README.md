@@ -115,47 +115,8 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 
 ### 5.1. Diagrama de Arquitectura del Sistema
 
-```mermaid
-graph LR
-    API_Football[Api-Football] -->|Datos de Partidos| Feeders_Module[Módulo Feeders]
-    Feeders_Module -->|Mensajes JMS| ActiveMQ[Broker ActiveMQ]
-    
-    ActiveMQ -->|Match_Topic| EventReceiver_Odds[EventReceiver Cuotas<br>(event-store)]
-    ActiveMQ -->|MatchApi_Topic| EventReceiver_Api[EventReceiver API<br>(event-store)]
 
-    EventReceiver_Odds -->|Escribe JSON Array| DL_Odds[Datalake: Match_Topic/<date>.events]
-    EventReceiver_Api -->|Escribe JSON Array| DL_Api[Datalake: MatchApi_Topic/<date>.events]
-
-    subgraph SpringBootApp [Aplicación Business Unit (Java 21)]
-        direction TB
-        BSU_Controller[MatchController<br>(Endpoints HTTP)]
-        BSU_Thymeleaf[Thymeleaf<br>(Vistas HTML)]
-        BSU_SSE_Service[MatchSseService<br>(SSE Emitters)]
-        BSU_Data_Service[MatchDataService<br>(Caché/DataMart Lógico, Polling Datalake, Fusión, Escritura DataMart Físico)]
-        BSU_Models[Modelos Java<br>(MatchEvent, DTOs)]
-        BSU_Datalake_Access[Acceso a Datalake<br>(Lectura Archivos .events)]
-        BSU_Datamart_Writer[Escritor de DataMart<br>(output_datamart/...json)]
-    end
-
-    DL_Odds -->|Lee| BSU_Data_Service
-    DL_Api -->|Lee| BSU_Data_Service
-    BSU_Data_Service -->|Escribe| BSU_Datamart_Writer
-
-    Browser[Navegador Usuario] <-->|HTTP/SSE| BSU_Controller
-    BSU_Controller <--> BSU_Thymeleaf
-    BSU_Controller <--> BSU_Data_Service
-    BSU_Data_Service <--> BSU_SSE_Service
-    BSU_SSE_Service <--> Browser
-
-    style Feeders_Module fill:#lightgrey,stroke:#333
-    style ActiveMQ fill:#orange,stroke:#333
-    style EventReceiver_Odds fill:#lightgrey,stroke:#333
-    style EventReceiver_Api fill:#lightgrey,stroke:#333
-    style DL_Odds fill:#lightblue,stroke:#333
-    style DL_Api fill:#lightblue,stroke:#333
-    style SpringBootApp fill:#ccf,stroke:#333,stroke-width:2px
-    style BSU_Datamart_Writer fill:#lightgreen,stroke:#333
-Descripción del Diagrama de Sistema:
+### 5.2 Descripción del Diagrama de Sistema:
 
 Api-Football: Fuente externa de datos de partidos.
 Módulo Feeders: Consume datos de Api-Football y los publica en tópicos de ActiveMQ.
@@ -168,59 +129,11 @@ MatchController: Maneja las peticiones HTTP, obtiene datos del MatchDataService,
 MatchSseService: Permite a los clientes (navegadores) suscribirse a actualizaciones. Cuando MatchDataService actualiza su caché, notifica a este servicio para enviar los nuevos datos a los clientes.
 Output DataMart (Sistema de Archivos): Almacena el archivo .datamart.json generado.
 Navegador del Usuario: Interactúa con la aplicación, recibe el HTML inicial y luego actualizaciones en tiempo real vía SSE.
-5.2. Diagrama de Arquitectura de la Aplicación (Módulo business-unit)
-Fragmento de código
 
-graph TD
-    subgraph ClienteWeb [Navegador del Cliente]
-        UI_Overview[matches_overview.html]
-        UI_Details[match_details.html<br>(con Gráfico de Cuotas)]
-        JS_SSE_Handler[JavaScript SSE Handler]
-    end
+5.3. Diagrama de Arquitectura de la Aplicación (Módulo business-unit)
 
-    subgraph ServidorApp [Business Unit - Spring Boot]
-        direction TB
-        REST_Endpoints[MatchController<br>(<code>@GetMapping</code> para vistas y SSE stream)]
-        
-        subgraph CapaServicio [Capa de Servicio]
-            MDS[MatchDataService<br>- Caché <code>List&lt;MatchEvent&gt;</code> (DataMart Lógico)<br>- Polling Programado Datalake<br>- Normalización y Fusión de Datos<br>- Escritura de DataMart Físico<br>- Notificación de Cambios]
-            MSES[MatchSseService<br>- Gestión de Conexiones SSE<br>- Envío de Actualizaciones]
-        end
+## 6. Descripción del Diagrama de Aplicación:
 
-        ThymeleafEngine[Motor de Plantillas Thymeleaf]
-        
-        subgraph ModeloDatos [Modelo de Datos]
-            ME[MatchEvent.java (Objeto Fusionado)]
-            MEDTO[MatchEventDTO.java (Cuotas)]
-            MAPIDTO[MatchApiDataDTO.java (Estadio/Árbitro)]
-            MS[MatchStatus.java (Enum)]
-        end
-
-        subgraph UtilConfig [Utilidades y Configuración]
-            DTU[DateTimeUtil.java]
-            JC[JacksonConfig.java]
-            SC[SchedulingConfig (<code>@EnableScheduling</code>)]
-            DM_Writer[Lógica de Escritura a Archivo<br>(en MatchDataService)]
-        end
-        
-        AccesoDatalake[Acceso a Sistema de Archivos<br>(Lectura de <code>.events</code>)]
-    end
-
-    ClienteWeb --> |Peticiones HTTP| REST_Endpoints
-    REST_Endpoints --> |Renderiza con| ThymeleafEngine
-    REST_Endpoints --> |Obtiene Datos| MDS
-    ThymeleafEngine --> |Usa Datos del Modelo| ClienteWeb
-
-    JS_SSE_Handler --> |Establece Conexión SSE| REST_Endpoints
-    MSES --> |Empuja Eventos SSE| JS_SSE_Handler
-    
-    MDS --> |Notifica Cambios| MSES
-    MDS --> |Usa| ModeloDatos
-    MDS --> |Usa| UtilConfig
-    MDS --> |Lee de| AccesoDatalake
-    MDS --> |Escribe a| DM_Writer
-
-Descripción del Diagrama de Aplicación:
 Se muestra la interacción entre los componentes principales dentro del módulo business-unit:
 
 El cliente interactúa con los REST_Endpoints (definidos en MatchController).
