@@ -11,7 +11,7 @@ El objetivo fundamental es ofrecer una experiencia de usuario fluida y sencilla 
 
 ### Fuentes de Datos (Datalake)
 
-El sistema se nutre de información almacenada en un "datalake" local estructurado en archivos, simulando la ingesta de datos de diferentes fuentes o APIs:
+El sistema se nutre de información almacenada en un "datalake" local estructurado en archivos, alimentado por un feeder que hace scraping a la web de betfair y otro que realiza consultas a la api de api-football:
 
 * **`Match_Topic` (Fuente de Cuotas y Estado del Partido):**
     * **Ubicación:** `datalake/eventstore/Match_Topic/default/YYYYMMDD.events`
@@ -63,14 +63,14 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
     Asumiendo que tienes una estructura de proyecto con módulos como `feeders`, `event-store`, y `business-unit`. Deberás compilar cada módulo si es necesario (`mvn clean package`).
 
     * **a. Módulo `feeders`:**
-        * Este módulo es responsable de obtener datos de fuentes externas (como Api-Football) y enviarlos a los tópicos JMS.
+        * Este módulo es responsable de obtener datos de fuentes externas (Api-Football y Betfair) y enviarlos a los tópicos JMS.
         * Ejecuta la clase principal (Main) de este módulo.
         * Se te solicitará ingresar tu API Key de Api-Football.
         * Este módulo comenzará a enviar datos a los tópicos JMS (`Match_Topic`, `MatchApi_Topic`).
 
     * **b. Módulo `event-store` (EventReceivers):**
         * Este módulo contiene los listeners JMS (`EventReceiver` para `Match_Topic` y `EventReceiverApi` para `MatchApi_Topic`) que escuchan los mensajes de los `feeders` y los persisten en los archivos `.events` del datalake.
-        * Ejecuta la clase principal (Main) de este módulo (o las clases de los listeners si se ejecutan por separado).
+        * Ejecuta las clases de los listeners que se ejecutan por separado.
 
     * **c. Módulo `business-unit` (Aplicación Principal):**
         * Este es el módulo que hemos estado desarrollando, contiene la lógica de negocio, el DataMart en memoria y la interfaz web.
@@ -85,7 +85,7 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 * **Vista Principal de Partidos:**
     * URL: `http://localhost:8080/laliga/matches`
     * Muestra partidos "EN DIRECTO" y "PRÓXIMOS PARTIDOS" en tarjetas interactivas.
-    * Se actualiza automáticamente vía Server-Sent Events (SSE).
+    * Se actualiza automáticamente el datamart vía Server-Sent Events (SSE) pero hay que actualizar la página para ver los cambios.
 
 * **Detalle del Partido:**
     * Haz clic en cualquier partido desde la vista principal.
@@ -93,10 +93,6 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
     * Muestra información detallada: equipos, hora/estado, cuotas actuales, fuente de cuotas (Betfair con logo), estadio, árbitro.
     * Presenta un **gráfico de la evolución de las cuotas** (`oddsHome`, `oddsDraw`, `oddsAway`) a lo largo del tiempo, usando el `timeStamp` del evento para datos pre-partido y el minuto de juego (`dateTime`) para datos durante el partido.
     * También se actualiza vía SSE.
-
-* **Stream SSE (para depuración):**
-    * URL: `http://localhost:8080/laliga/matches/stream`
-    * Permite ver los eventos `match-update` en crudo con el payload JSON de la lista de `MatchEvent` fusionados.
 
 * **Archivo del DataMart Físico:**
     * Ubicación: `output_datamart/default/YYYYMMDD.datamart.json`
@@ -109,13 +105,13 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 
 ### 5.2 Descripción del Diagrama de Sistema:
 
-   * Api-Football: Fuente externa de datos de partidos.
-   * Módulo Feeders: Consume datos de Api-Football y los publica en tópicos de ActiveMQ.
+   * Api-Football y Scraping de Betfair: Fuentes externas de datos de partidos.
+   * Módulo Feeders: Consume datos de Api-Football y del Web Scraping y los publica en tópicos de ActiveMQ.
    * ActiveMQ: Broker de mensajería que desacopla los feeders de los event receivers.
    * Módulo Event-Store (EventReceivers): Se suscribe a los tópicos de ActiveMQ y escribe los datos crudos en archivos .events en el Datalake (separados para cuotas y para API de estadio/árbitro).
    * Datalake (Sistema de Archivos): Almacena los archivos .events diarios.
    * Aplicación Business Unit (Spring Boot):
-   * MatchDataService: Lee periódicamente los archivos .events del Datalake, normaliza nombres de equipo, fusiona la información de ambas fuentes en objetos MatchEvent, mantiene esta lista fusionada como una caché en memoria (el DataMart lógico) y escribe un snapshot a un archivo físico (.datamart.json).
+     * MatchDataService: Lee periódicamente los archivos .events del Datalake, normaliza nombres de equipo, fusiona la información de ambas fuentes en objetos MatchEvent, mantiene esta lista fusionada como una caché en memoria (el DataMart lógico) y escribe un snapshot a un archivo físico (.datamart.json).
    * MatchController: Maneja las peticiones HTTP, obtiene datos del MatchDataService, y usa Thymeleaf para renderizar las vistas.
    * MatchSseService: Permite a los clientes (navegadores) suscribirse a actualizaciones. Cuando MatchDataService actualiza su caché, notifica a este servicio para enviar los nuevos datos a los clientes.
    * Output DataMart (Sistema de Archivos): Almacena el archivo .datamart.json generado.
