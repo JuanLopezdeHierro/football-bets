@@ -109,17 +109,17 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 
 ### 5.2 Descripción del Diagrama de Sistema:
 
-Api-Football: Fuente externa de datos de partidos.
-Módulo Feeders: Consume datos de Api-Football y los publica en tópicos de ActiveMQ.
-ActiveMQ: Broker de mensajería que desacopla los feeders de los event receivers.
-Módulo Event-Store (EventReceivers): Se suscribe a los tópicos de ActiveMQ y escribe los datos crudos en archivos .events en el Datalake (separados para cuotas y para API de estadio/árbitro).
-Datalake (Sistema de Archivos): Almacena los archivos .events diarios.
-Aplicación Business Unit (Spring Boot):
-MatchDataService: Lee periódicamente los archivos .events del Datalake, normaliza nombres de equipo, fusiona la información de ambas fuentes en objetos MatchEvent, mantiene esta lista fusionada como una caché en memoria (el DataMart lógico) y escribe un snapshot a un archivo físico (.datamart.json).
-MatchController: Maneja las peticiones HTTP, obtiene datos del MatchDataService, y usa Thymeleaf para renderizar las vistas.
-MatchSseService: Permite a los clientes (navegadores) suscribirse a actualizaciones. Cuando MatchDataService actualiza su caché, notifica a este servicio para enviar los nuevos datos a los clientes.
-Output DataMart (Sistema de Archivos): Almacena el archivo .datamart.json generado.
-Navegador del Usuario: Interactúa con la aplicación, recibe el HTML inicial y luego actualizaciones en tiempo real vía SSE.
+   * Api-Football: Fuente externa de datos de partidos.
+   * Módulo Feeders: Consume datos de Api-Football y los publica en tópicos de ActiveMQ.
+   * ActiveMQ: Broker de mensajería que desacopla los feeders de los event receivers.
+   * Módulo Event-Store (EventReceivers): Se suscribe a los tópicos de ActiveMQ y escribe los datos crudos en archivos .events en el Datalake (separados para cuotas y para API de estadio/árbitro).
+   * Datalake (Sistema de Archivos): Almacena los archivos .events diarios.
+   * Aplicación Business Unit (Spring Boot):
+   * MatchDataService: Lee periódicamente los archivos .events del Datalake, normaliza nombres de equipo, fusiona la información de ambas fuentes en objetos MatchEvent, mantiene esta lista fusionada como una caché en memoria (el DataMart lógico) y escribe un snapshot a un archivo físico (.datamart.json).
+   * MatchController: Maneja las peticiones HTTP, obtiene datos del MatchDataService, y usa Thymeleaf para renderizar las vistas.
+   * MatchSseService: Permite a los clientes (navegadores) suscribirse a actualizaciones. Cuando MatchDataService actualiza su caché, notifica a este servicio para enviar los nuevos datos a los clientes.
+   * Output DataMart (Sistema de Archivos): Almacena el archivo .datamart.json generado.
+   * Navegador del Usuario: Interactúa con la aplicación, recibe el HTML inicial y luego actualizaciones en tiempo real vía SSE.
 
 5.3. Diagrama de Arquitectura de la Aplicación (Módulo business-unit)
 
@@ -127,24 +127,25 @@ Navegador del Usuario: Interactúa con la aplicación, recibe el HTML inicial y 
 
 Se muestra la interacción entre los componentes principales dentro del módulo business-unit:
 
-El cliente interactúa con los REST_Endpoints (definidos en MatchController).
-El MatchController utiliza MatchDataService para la lógica de negocio y datos, y ThymeleafEngine para la representación.
-MatchDataService es central, manejando la caché (DataMart lógico), el polling, la fusión, y la interacción con MatchSseService para las actualizaciones en tiempo real.
-El JavaScript del cliente maneja los eventos SSE recibidos de MatchSseService.
-6. Principios y Patrones de Diseño Aplicados
-Arquitectura en Capas (implícita): Presentación (Controlador, Thymeleaf, JS), Servicio (MatchDataService, MatchSseService), Dominio (Modelos Java), Acceso a Datos (adaptado a archivos).
-Inyección de Dependencias (Spring): Usado para gestionar y conectar componentes (@Service, @Controller, @Autowired).
-Single Responsibility Principle (SRP):
-MatchController: Manejo de peticiones web.
-MatchDataService: Lógica de datos, fusión, caché, polling y escritura del DataMart.
-MatchSseService: Comunicación SSE.
-EventReceivers (en event-store): Responsabilidad única de persistir datos de un tópico JMS al datalake.
-Feeders (en módulo feeders): Responsabilidad de obtener datos externos y publicarlos.
-Patrón Observador (SSE): El frontend se suscribe a eventos del backend.
-Patrón DTO: MatchEventDTO y MatchApiDataDTO para la transferencia de datos desde las fuentes JSON.
-Programación Orientada a Eventos (parcial): Con SSE y la respuesta a cambios en el datalake.
-Tareas Programadas (@Scheduled): Para el polling periódico y desacoplado del datalake.
-Normalización de Datos: Aplicada en MatchDataService para la fusión consistente de nombres de equipos.
-Caché en Memoria: Usada en MatchDataService para un acceso rápido a los datos fusionados.
-Desacoplamiento (con ActiveMQ): El broker de mensajería desacopla los productores de datos (feeders) de los consumidores iniciales (event-store).
-DataMart: La caché matchEventsCache y el archivo YYYYMMDD.datamart.json actúan como un DataMart, proporcionando una vista consolidada y procesada de los datos para la aplicación.
+   *El cliente interactúa con los REST_Endpoints (definidos en MatchController).
+   *El MatchController utiliza MatchDataService para la lógica de negocio y datos, y ThymeleafEngine para la representación.
+   *MatchDataService es central, manejando la caché (DataMart lógico), el polling, la fusión, y la interacción con MatchSseService para las actualizaciones en tiempo real.
+   *El JavaScript del cliente maneja los eventos SSE recibidos de MatchSseService.
+   
+## 7. Principios y Patrones de Diseño Aplicados
+   *Arquitectura en Capas (implícita): Presentación (Controlador, Thymeleaf, JS), Servicio (MatchDataService, MatchSseService), Dominio (Modelos Java), Acceso a Datos (adaptado a archivos).
+   *Inyección de Dependencias (Spring): Usado para gestionar y conectar componentes (@Service, @Controller, @Autowired).
+   *Single Responsibility Principle (SRP):
+   *MatchController: Manejo de peticiones web.
+   *MatchDataService: Lógica de datos, fusión, caché, polling y escritura del DataMart.
+   *MatchSseService: Comunicación SSE.
+   *EventReceivers (en event-store): Responsabilidad única de persistir datos de un tópico JMS al datalake.
+   *Feeders (en módulo feeders): Responsabilidad de obtener datos externos y publicarlos.
+   *Patrón Observador (SSE): El frontend se suscribe a eventos del backend.
+   *Patrón DTO: MatchEventDTO y MatchApiDataDTO para la transferencia de datos desde las fuentes JSON.
+   *Programación Orientada a Eventos (parcial): Con SSE y la respuesta a cambios en el datalake.
+   *Tareas Programadas (@Scheduled): Para el polling periódico y desacoplado del datalake.
+   *Normalización de Datos: Aplicada en MatchDataService para la fusión consistente de nombres de equipos.
+   *Caché en Memoria: Usada en MatchDataService para un acceso rápido a los datos fusionados.
+   *Desacoplamiento (con ActiveMQ): El broker de mensajería desacopla los productores de datos (feeders) de los consumidores iniciales (event-store).
+   *DataMart: La caché matchEventsCache y el archivo YYYYMMDD.datamart.json actúan como un DataMart, proporcionando una vista consolidada y procesada de los datos para la aplicación.
