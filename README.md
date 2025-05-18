@@ -41,7 +41,7 @@ Ofrecer a aficionados y apostadores una plataforma clara, actualizada automátic
 
 ### ✅ Requisitos
 
-- JDK 17+
+- JDK 21+
 - Apache Maven 3.6+
 - Estructura esperada del datalake
 
