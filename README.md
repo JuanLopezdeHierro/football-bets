@@ -97,6 +97,12 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 * **Archivo del DataMart Físico:**
     * Ubicación: `output_datamart/default/YYYYMMDD.datamart.json`
     * Contiene el snapshot JSON de los datos de partido fusionados, generado por la aplicación.
+ 
+### Video de ejemplo de uso:
+## 🎥 Demostración en Vídeo
+
+[![Ver vídeo en YouTube](https://img.youtube.com/vi/9yrXk3bIQQg/0.jpg)](https://www.youtube.com/watch?v=9yrXk3bIQQg)
+
 
 ## 5. Arquitectura
 
