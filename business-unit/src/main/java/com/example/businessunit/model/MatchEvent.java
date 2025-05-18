@@ -1,10 +1,8 @@
 package com.example.businessunit.model;
 
-// No importamos lombok.Getter
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-// No hay anotación @Getter a nivel de clase
 public class MatchEvent {
     private final String id;
     private final ZonedDateTime timeStamp;
@@ -53,7 +51,6 @@ public class MatchEvent {
         this.oddsSource = "Betfair";
     }
 
-    // --- Getters Manuales ---
     public String getId() { return id; }
     public ZonedDateTime getTimeStamp() { return timeStamp; }
     public String getDateTimeString() { return dateTimeString; }
@@ -71,7 +68,6 @@ public class MatchEvent {
     public String getReferee() { return referee; }
     public String getOddsSource() { return oddsSource; }
 
-    // --- Setters para campos mutables ---
     public void setMatchStatus(MatchStatus matchStatus) { this.matchStatus = matchStatus; }
     public void setOddsDraw(double oddsDraw) { this.oddsDraw = oddsDraw; }
     public void setOddsAway(double oddsAway) { this.oddsAway = oddsAway; }

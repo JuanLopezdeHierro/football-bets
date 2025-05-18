@@ -16,7 +16,7 @@ import java.util.List;
 
 public class FootballWebScrapingImpl implements FootballWebScraping {
 
-    private static final String URL = "https://www.betfair.es/sport/football/la-liga-espa%C3%B1ola/117";
+    private static final String URL = "https://www.betfair.es/sport/football/premier-league-inglesa/10932509";
 
 
     @Override

@@ -71,11 +71,10 @@ public class MatchDataService {
         this.sseService = sseService;
     }
 
-    // Clase interna para el historial de cuotas
     @Getter
     public static class OddsHistoryPoint {
-        private final String timeLabel; // "19:00", "23′", "HT" - para el eje X del gráfico
-        private final ZonedDateTime timestampRecord; // El timeStamp del DTO, para ordenación precisa
+        private final String timeLabel;
+        private final ZonedDateTime timestampRecord;
         private final double oddsHome;
         private final double oddsAway;
         private final double oddsDraw;
@@ -355,16 +354,15 @@ public class MatchDataService {
                     List<MatchEventDTO> dtosInLine = objectMapper.readValue(line, new TypeReference<List<MatchEventDTO>>() {});
                     for (MatchEventDTO dto : dtosInLine) {
                         if (targetTeamHome.equalsIgnoreCase(dto.getTeamHome()) &&
-                                (targetTeamAway == null || targetTeamAway.equalsIgnoreCase(dto.getTeamAway()))) { // Hacer awayTeam opcional si no siempre está
+                                (targetTeamAway == null || targetTeamAway.equalsIgnoreCase(dto.getTeamAway()))) {
 
                             ZonedDateTime dtoEventTime = dto.getTimeStamp() != null ? dto.getTimeStamp() : ZonedDateTime.now(ZoneId.systemDefault());
-                            // Comprobar si el DTO es del mismo día del partido o si es un tiempo en vivo (que asumimos es del día)
                             boolean isSameDayOrLive = false;
                             ZonedDateTime dtoMatchTimeForDate = DateTimeUtil.parseCustomDateTime(dto.getDateTime());
                             if (LIVE_TIME_PATTERN.matcher(dto.getDateTime()).matches()) {
-                                isSameDayOrLive = true; // Tiempo en vivo es del partido actual
+                                isSameDayOrLive = true;
                             } else if (dtoMatchTimeForDate != null && dtoMatchTimeForDate.toLocalDate().equals(matchDate)) {
-                                isSameDayOrLive = true; // Hora de inicio programada del mismo día
+                                isSameDayOrLive = true;
                             }
 
                             if (isSameDayOrLive) {

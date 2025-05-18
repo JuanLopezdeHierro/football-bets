@@ -23,7 +23,6 @@ public class Controller {
 
     private final ScheduledExecutorService scheduler;
 
-    /** Pide la API key, inicializa clientes y providers. */
     public Controller() {
         Scanner scanner = new Scanner(System.in);
         System.out.print("Ingrese su API Key de API-SPORTS.IO: ");
@@ -39,7 +38,6 @@ public class Controller {
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
     }
 
-    /** Arranca ambos feeders cada 10 minutos. */
     public void start() {
         // Scraping Betfair → Match_Topic
         scheduler.scheduleAtFixedRate(
@@ -88,7 +86,6 @@ public class Controller {
         }
     }
 
-    /** Detiene el scheduler. */
     public void stop() {
         logger.info("Deteniendo Feeder Controller...");
         scheduler.shutdown();

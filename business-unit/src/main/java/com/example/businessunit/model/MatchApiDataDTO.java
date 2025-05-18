@@ -19,12 +19,12 @@ public class MatchApiDataDTO {
     @JsonProperty("homeTeam")
     private String homeTeam;
 
-    @JsonProperty("awayTeam") // Asumiendo que podría venir o ser útil para la clave
+    @JsonProperty("awayTeam")
     private String awayTeam;
 
     @JsonProperty("referee")
     private String referee;
 
-    @JsonProperty("dateTime") // Asumiendo que podría venir para ayudar a identificar el partido
+    @JsonProperty("dateTime")
     private String dateTime;
 }

@@ -22,19 +22,14 @@ public class FootballApiClientImpl {
         this.apiKey = apiKey;
     }
 
-    /**
-     * Recupera los partidos de La Liga (id=140) de mañana y devuelve
-     * una lista de Fixtures con referee, stadium, homeTeam y round.
-     */
+
     public List<Fixtures> fetchLaLigaFixtures() {
         List<Fixtures> fixturesList = new ArrayList<>();
 
         try {
-            // Fecha de mañana
             LocalDate tomorrow = LocalDate.now().plusDays(0);
             String dateParam = tomorrow.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-            // Conexión
             URL url = new URL(API_URL + dateParam);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("x-rapidapi-host", "v3.football.api-sports.io");
@@ -46,10 +41,8 @@ public class FootballApiClientImpl {
                 throw new IOException("API responded with code " + conn.getResponseCode());
             }
 
-            // Parsear array "response"
             JSONArray response = getResponseArray(conn);
 
-            // Filtrar y mapear a Fixtures
             for (int i = 0; i < response.length(); i++) {
                 JSONObject item = response.getJSONObject(i);
                 JSONObject league = item.getJSONObject("league");
@@ -80,9 +73,6 @@ public class FootballApiClientImpl {
         return fixturesList;
     }
 
-    /**
-     * Convierte una lista de Fixtures a JSONArray, igual que matchDataToJson().
-     */
     public JSONArray fixturesToJson(List<Fixtures> fixturesList, boolean includeMeta) {
         JSONArray array = new JSONArray();
         for (Fixtures f : fixturesList) {
@@ -100,7 +90,6 @@ public class FootballApiClientImpl {
         return array;
     }
 
-    /** Lee todo el InputStream y devuelve el JSONArray "response". */
     private static JSONArray getResponseArray(HttpURLConnection conn) throws IOException {
         try (BufferedReader in = new BufferedReader(
                 new InputStreamReader(conn.getInputStream()))) {
