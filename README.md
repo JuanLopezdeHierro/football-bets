@@ -5,7 +5,7 @@
 Este proyecto es una aplicación web desarrollada en **Java 21** que permite a los usuarios visualizar información detallada y actualizada de los partidos de fútbol de LaLiga. La plataforma ofrece horarios, estado de los partidos (próximos, en directo, históricos), cuotas de apuestas en tiempo real (victoria local, empate, victoria visitante), información contextual como el estadio y el árbitro del partido.
 
 **Propuesta de Valor Principal:**
-El objetivo fundamental es ofrecer una experiencia de usuario fluida y sencilla para consultar todos los partidos de LaLiga, con un énfasis especial en la **evolución de las cuotas a lo largo del tiempo**, presentada mediante un gráfico interactivo. Esto permite a los aficionados y a los interesados en las apuestas deportivas seguir las tendencias y fluctuaciones de las cuotas de manera clara y directa, todo actualizado en tiempo real sin necesidad de recargar la página.
+El objetivo fundamental es ofrecer una experiencia de usuario fluida y sencilla para consultar todos los partidos de LaLiga, con un énfasis especial en la **evolución de las cuotas a lo largo del tiempo**, presentada mediante un gráfico interactivo. Esto permite a los aficionados y a los interesados en las apuestas deportivas seguir las tendencias y fluctuaciones de las cuotas de manera clara y directa, todo actualizado en tiempo real.
 
 ## 2. Justificación de la Elección de Fuentes de Datos y Estructura del DataMart
 
