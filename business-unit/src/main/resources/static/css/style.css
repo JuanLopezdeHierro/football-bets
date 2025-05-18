@@ -543,3 +543,33 @@ a:hover {
         margin-bottom: 3px;
     }
 }
+
+.card-style-section { /* Clase genérica para secciones con estilo de tarjeta */
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--card-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.odds-chart-container {
+    /* Ya usa card-style-section, se pueden añadir más estilos específicos si es necesario */
+    min-height: 300px; /* Altura mínima para el gráfico */
+    max-height: 450px; /* Altura máxima */
+    position: relative; /* Necesario para que Chart.js gestione el tamaño del canvas correctamente */
+}
+
+.odds-chart-container h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+    font-size: 1.2em;
+}
+
+.no-data-message { /* Para cuando no hay historial de cuotas */
+    text-align: center;
+    padding: 20px;
+    color: var(--secondary-color);
+    font-style: italic;
+}

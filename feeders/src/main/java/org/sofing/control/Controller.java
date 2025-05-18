@@ -44,7 +44,7 @@ public class Controller {
         // Scraping Betfair → Match_Topic
         scheduler.scheduleAtFixedRate(
                 this::runWebScraping,
-                0, 10, TimeUnit.MINUTES
+                0, 1, TimeUnit.MINUTES
         );
         logger.info("Scraping Betfair programado cada 10 minutos en Match_Topic");
 

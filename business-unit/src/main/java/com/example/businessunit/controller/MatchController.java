@@ -52,10 +52,16 @@ public class MatchController {
 
             if (selectedMatch.getHomeTeamLogoUrl() == null && selectedMatch.getTeamHome() != null) {
                 model.addAttribute("homeLogo", "/images/logos/" + selectedMatch.getTeamHome().replace(" ", "_") + ".png");
+            } else if (selectedMatch.getHomeTeamLogoUrl() != null) {
+                model.addAttribute("homeLogo", selectedMatch.getHomeTeamLogoUrl());
             }
+
             if (selectedMatch.getAwayTeamLogoUrl() == null && selectedMatch.getTeamAway() != null) {
                 model.addAttribute("awayLogo", "/images/logos/" + selectedMatch.getTeamAway().replace(" ", "_") + ".png");
+            } else if (selectedMatch.getAwayTeamLogoUrl() != null) {
+                model.addAttribute("awayLogo", selectedMatch.getAwayTeamLogoUrl());
             }
+
 
             List<MatchEvent> allPotentiallyRelevantMatches = matchDataService.getAllMatchEvents();
             List<MatchEvent> otherMatchesList = allPotentiallyRelevantMatches.stream()
@@ -69,9 +75,17 @@ public class MatchController {
                     .collect(Collectors.toList());
             model.addAttribute("otherMatchesList", otherMatchesList);
 
+            List<MatchDataService.OddsHistoryPoint> oddsHistory = matchDataService.getOddsHistoryForMatch(
+                    selectedMatch.getTeamHome(),
+                    selectedMatch.getTeamAway(),
+                    selectedMatch.getDateTimeString()
+            );
+            model.addAttribute("oddsHistoryData", oddsHistory);
+
         } else {
             model.addAttribute("selectedMatch", null);
             model.addAttribute("otherMatchesList", List.of());
+            model.addAttribute("oddsHistoryData", List.of());
             model.addAttribute("errorMessage", "Partido no encontrado con ID: " + idDelPartido);
         }
         return "match_details";

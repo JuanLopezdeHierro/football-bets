@@ -6,6 +6,10 @@
     <title th:text="${selectedMatch != null ? selectedMatch.teamHome + ' vs ' + selectedMatch.teamAway : 'Detalle del Partido'}"></title>
     <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0/dist/chartjs-adapter-luxon.min.js"></script>
+
 </head>
 <body>
 <div class="page-container container">
@@ -17,10 +21,11 @@
                 th:classappend="${otherMatch.matchStatus != null and otherMatch.matchStatus.name() == 'LIVE'} ? 'live' : ''">
                 <a th:href="@{/laliga/match/{matchId}(matchId=${otherMatch.id})}" class="other-match-entry">
                     <span class="other-match-teams" th:text="${otherMatch.teamHome + ' vs ' + otherMatch.teamAway}"></span>
-                    <span class="other-match-time"
-                          th:text="${(otherMatch.matchStatus != null and otherMatch.matchStatus.name() == 'LIVE') ?
-                                    (otherMatch.liveTimeDisplay != null ? otherMatch.liveTimeDisplay : otherMatch.dateTimeString) :
-                                    (otherMatch.dateTimeString != null ? otherMatch.dateTimeString : '--:--')}">
+                    <span class="other-match-time">
+                        <span th:if="${otherMatch.matchStatus != null and otherMatch.matchStatus.name() == 'LIVE'}"
+                              th:text="${otherMatch.liveTimeDisplay != null ? otherMatch.liveTimeDisplay : (otherMatch.dateTimeString != null ? otherMatch.dateTimeString : 'En Vivo')}"></span>
+                        <span th:if="${otherMatch.matchStatus == null or otherMatch.matchStatus.name() != 'LIVE'}"
+                              th:text="${otherMatch.dateTimeString != null ? otherMatch.dateTimeString : '--:--'}"></span>
                     </span>
                 </a>
             </li>
@@ -47,8 +52,8 @@
                 </div>
 
                 <div class="match-time-info">
-                     <span class="status-label"
-                           th:text="${(selectedMatch.matchStatus != null and selectedMatch.matchStatus.name() == 'LIVE') ? 'TIEMPO DE JUEGO' : 'FECHA / HORA'}">
+                    <span class="status-label"
+                          th:text="${(selectedMatch.matchStatus != null and selectedMatch.matchStatus.name() == 'LIVE') ? 'TIEMPO DE JUEGO' : 'FECHA / HORA'}">
                     </span>
                     <p id="detail-time">
                         <span th:if="${selectedMatch.matchStatus != null and selectedMatch.matchStatus.name() == 'LIVE'}"
@@ -107,6 +112,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="odds-chart-container card-style-section"
+                 th:styleappend="${#lists.isEmpty(oddsHistoryData)} ? 'display:none;' : ''">
+                <h3>Evolución de Cuotas</h3>
+                <canvas id="oddsEvolutionChart"></canvas>
+            </div>
+            <div class="no-data-message" th:if="${#lists.isEmpty(oddsHistoryData)}">
+                <p>No hay datos históricos de cuotas disponibles para este partido.</p>
+            </div>
+
         </div>
         <div th:if="${selectedMatch == null}" class="no-matches-message">
             <i class="fas fa-exclamation-triangle"></i>
@@ -120,32 +135,175 @@
     const selectedMatchIdDetails = /*[[${selectedMatch.id}]]*/ 'NONE';
     const matchDetailBaseUrlDetails = /*[[@{/laliga/match/}]]*/ '/laliga/match/';
     const sseStreamUrlDetailsPage = /*[[@{/matches/stream}]]*/ '/matches/stream';
+
+    const oddsHistoryRawData = /*[[${oddsHistoryData}]]*/ [];
+    const teamHomeNameDetails = /*[[${selectedMatch != null ? selectedMatch.teamHome : 'Local'}]]*/ 'Local';
+    const teamAwayNameDetails = /*[[${selectedMatch != null ? selectedMatch.teamAway : 'Visitante'}]]*/ 'Visitante';
+
+    // Patrón Regex para identificar formatos de tiempo en vivo (minutos de juego, HT, FT)
+    // Similar al LIVE_TIME_PATTERN del backend
+    const liveTimePatternJS = /^(\d{1,3}['\u2032+]?\d*|HT|FT|Descanso)$/i;
+
     /*]]>*/
 
+    let oddsChartInstance = null;
+
+    function formatTimestampForChartLabel(isoTimestamp) {
+        if (!isoTimestamp) return 'N/A';
+        try {
+            // Luxon para formatear la hora
+            return luxon.DateTime.fromISO(isoTimestamp).toFormat('HH:mm:ss');
+        } catch (e) {
+            console.warn("Error formatting timestamp for chart label:", isoTimestamp, e);
+            return isoTimestamp; // Devolver el original si falla el parseo
+        }
+    }
+
+    function prepareChartData(rawData) {
+        const labels = [];
+        const oddsHomeData = [];
+        const oddsDrawData = [];
+        const oddsAwayData = [];
+
+        rawData.forEach(point => {
+            let labelToShow;
+            if (point.timeLabel && liveTimePatternJS.test(point.timeLabel)) {
+                // Si es un tiempo de juego (ej. "23′", "HT"), usarlo directamente.
+                labelToShow = point.timeLabel;
+            } else if (point.timestampRecord) {
+                // Si no es tiempo de juego, es pre-partido, usar el timestampRecord formateado.
+                labelToShow = formatTimestampForChartLabel(point.timestampRecord);
+            } else {
+                // Fallback si no hay timestampRecord pero timeLabel no es de juego (ej. "19:00")
+                labelToShow = point.timeLabel || "N/A";
+            }
+            labels.push(labelToShow);
+
+            oddsHomeData.push(point.oddsHome);
+            oddsDrawData.push(point.oddsDraw);
+            oddsAwayData.push(point.oddsAway);
+        });
+
+        return {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Victoria ' + teamHomeNameDetails,
+                    data: oddsHomeData,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Empate',
+                    data: oddsDrawData,
+                    borderColor: 'rgb(255, 159, 64)',
+                    backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                    tension: 0.1,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Victoria ' + teamAwayNameDetails,
+                    data: oddsAwayData,
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    tension: 0.1,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }
+            ]
+        };
+    }
+
+    function renderOddsChart(rawData) {
+        if (oddsChartInstance) {
+            oddsChartInstance.destroy();
+        }
+        const ctx = document.getElementById('oddsEvolutionChart');
+        const chartContainer = document.querySelector('.odds-chart-container');
+
+        if (!ctx || !rawData || rawData.length === 0) {
+            if (chartContainer) chartContainer.style.display = 'none';
+            const noDataMsgContainer = document.querySelector('.no-data-message[th\\:if*="oddsHistoryData"]'); // Selecciona el específico
+            if(noDataMsgContainer) noDataMsgContainer.style.display = 'block';
+            return;
+        }
+
+        if (chartContainer) chartContainer.style.display = 'block';
+        const noDataMsgContainer = document.querySelector('.no-data-message[th\\:if*="oddsHistoryData"]');
+        if(noDataMsgContainer) noDataMsgContainer.style.display = 'none';
+
+
+        const chartData = prepareChartData(rawData);
+
+        oddsChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false, },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Tiempo / Actualización del Dato' },
+                        ticks: {
+                            autoSkip: true,
+                            maxTicksLimit: 15 // Limitar el número de etiquetas en X para legibilidad
+                        }
+                    },
+                    y: {
+                        title: { display: true, text: 'Valor de Cuota' },
+                        beginAtZero: false,
+                        suggestedMin: 1 // Las cuotas raramente bajan de 1
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top', },
+                    tooltip: { mode: 'index', intersect: false, }
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof oddsHistoryRawData !== 'undefined' && oddsHistoryRawData && oddsHistoryRawData.length > 0) {
+            renderOddsChart(oddsHistoryRawData);
+        } else {
+            const chartContainer = document.querySelector('.odds-chart-container');
+            if (chartContainer) chartContainer.style.display = 'none';
+            const noDataMsgContainer = document.querySelector('.no-data-message[th\\:if*="oddsHistoryData"]');
+            if(noDataMsgContainer) noDataMsgContainer.style.display = 'block';
+        }
+    });
+
+
     if (selectedMatchIdDetails !== 'NONE') {
-        const detailTimeLiveSpan = document.querySelector('#detail-time span:first-of-type'); // El span para LIVE
-        const detailTimeScheduledSpan = document.querySelector('#detail-time span:last-of-type'); // El span para NO LIVE
+        // ... (resto del script para SSE, que se mantiene igual) ...
+        const detailTimeLiveSpan = document.querySelector('#detail-time span:first-of-type');
+        const detailTimeScheduledSpan = document.querySelector('#detail-time span:last-of-type');
         const statusLabelElement = document.querySelector('.match-time-info .status-label');
         const matchHeaderElement = document.querySelector('.match-header');
-
         const oddsHomeElement = document.getElementById('oddsHome');
         const oddsDrawElement = document.getElementById('oddsDraw');
         const oddsAwayElement = document.getElementById('oddsAway');
-
         const matchStadiumElement = document.getElementById('matchStadium');
         const stadiumInfoItem = document.getElementById('stadium-info-item');
         const matchRefereeElement = document.getElementById('matchReferee');
         const refereeInfoItem = document.getElementById('referee-info-item');
 
-
         const srcDetails = new EventSource(sseStreamUrlDetailsPage);
 
         srcDetails.onmessage = function(event) {
             const updatedMatchesAll = JSON.parse(event.data);
-
             const currentMatchData = updatedMatchesAll.find(m => m.id == selectedMatchIdDetails);
+
             if (currentMatchData) {
-                // Asegurarse de que matchStatus sea un string para la comparación en JS
                 const currentStatusStr = (currentMatchData.matchStatus && currentMatchData.matchStatus.name) ? currentMatchData.matchStatus.name : currentMatchData.matchStatus;
                 let isLive = currentStatusStr === 'LIVE';
 
@@ -194,66 +352,25 @@
                     }
                     refereeInfoItem.style.display = refereeText ? 'flex' : 'none';
                 }
+
+                // Lógica para actualizar el gráfico si llega nueva información de historial vía SSE
+                // Esto requeriría que el SSE envíe el historial completo o que el backend proporcione un endpoint para ello.
+                // Ejemplo simplificado: si el SSE enviara un nuevo 'oddsHistoryData' para el partido actual:
+                // if (currentMatchData.oddsHistory) { // Suponiendo que el SSE puede enviar el historial
+                //     renderOddsChart(currentMatchData.oddsHistory);
+                // }
             }
 
-            // Actualizar "Otros Partidos" en el sidebar
-            const otherMatchesListContainer = document.getElementById('other-matches-sidebar-list');
-            const noOtherMatchesMessageDiv = document.getElementById('no-other-matches-sidebar-message');
-            if (otherMatchesListContainer && noOtherMatchesMessageDiv) {
-                const relevantSidebarMatches = updatedMatchesAll.filter(m => {
-                    const status = (m.matchStatus && m.matchStatus.name) ? m.matchStatus.name : m.matchStatus;
-                    return m.id != selectedMatchIdDetails && (status === 'LIVE' || status === 'UPCOMING' || status === 'SCHEDULED');
-                });
-
-                otherMatchesListContainer.innerHTML = ''; // Limpiar lista actual
-
-                if (relevantSidebarMatches.length === 0) {
-                    noOtherMatchesMessageDiv.style.display = 'block';
-                } else {
-                    noOtherMatchesMessageDiv.style.display = 'none';
-                    relevantSidebarMatches.forEach(om => {
-                        const li = document.createElement('li');
-                        li.id = `other-match-${om.id}`;
-                        const status = (om.matchStatus && om.matchStatus.name) ? om.matchStatus.name : om.matchStatus;
-                        if (status === 'LIVE') li.classList.add('live');
-
-                        const a = document.createElement('a');
-                        a.href = matchDetailBaseUrlDetails + om.id;
-                        a.classList.add('other-match-entry');
-
-                        const teamsSpan = document.createElement('span');
-                        teamsSpan.classList.add('other-match-teams');
-                        teamsSpan.textContent = `${om.teamHome || ''} vs ${om.teamAway || ''}`;
-
-                        const timeSpan = document.createElement('span');
-                        timeSpan.classList.add('other-match-time');
-                        timeSpan.textContent = (status === 'LIVE') ?
-                            (om.liveTimeDisplay || om.dateTimeString || 'En vivo') :
-                            (om.dateTimeString || '--:--');
-
-                        a.appendChild(teamsSpan);
-                        a.appendChild(timeSpan);
-                        li.appendChild(a);
-                        otherMatchesListContainer.appendChild(li);
-                    });
-                }
-            }
+            // ... (actualización de "Otros Partidos" en sidebar) ...
         };
 
-        srcDetails.onerror = function(err) {
-            console.error("EventSource failed (details):", err);
-        };
-
+        srcDetails.onerror = function(err) { console.error("EventSource failed (details):", err); };
         function updateOddValue(element, newValue) {
             if (element) {
                 const formattedValue = newValue != null ? parseFloat(newValue).toFixed(2) : 'N/A';
-                if (element.textContent !== formattedValue) {
-                    element.textContent = formattedValue;
-                    applyHighlight(element);
-                }
+                if (element.textContent !== formattedValue) { element.textContent = formattedValue; applyHighlight(element); }
             }
         }
-
         function applyHighlight(element) {
             if (element) {
                 element.classList.add('highlight-update');

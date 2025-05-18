@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter; // Para OddsHistoryPoint
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator; // Para ordenar
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +51,7 @@ public class MatchDataService {
     private final Path MATCH_API_EVENTS_DIRECTORY_PATH = Paths.get("datalake/eventstore/MatchApi_Topic/default");
     private final Path DATAMART_DIRECTORY_PATH = Paths.get("output_datamart/default");
 
-    private static final Pattern LIVE_TIME_PATTERN = Pattern.compile("^(\\d{1,3}['\u2032+]?\\d*|HT|FT|Descanso)$", Pattern.CASE_INSENSITIVE); // Añadido \u2032 para el apóstrofo 'prime'
+    private static final Pattern LIVE_TIME_PATTERN = Pattern.compile("^(\\d{1,3}['\u2032+]?\\d*|HT|FT|Descanso)$", Pattern.CASE_INSENSITIVE);
     private final DateTimeFormatter DAILY_FILE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
@@ -67,6 +69,24 @@ public class MatchDataService {
         this.objectMapper = objectMapper;
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
         this.sseService = sseService;
+    }
+
+    // Clase interna para el historial de cuotas
+    @Getter
+    public static class OddsHistoryPoint {
+        private final String timeLabel; // "19:00", "23′", "HT" - para el eje X del gráfico
+        private final ZonedDateTime timestampRecord; // El timeStamp del DTO, para ordenación precisa
+        private final double oddsHome;
+        private final double oddsAway;
+        private final double oddsDraw;
+
+        public OddsHistoryPoint(String timeLabel, ZonedDateTime timestampRecord, double oddsHome, double oddsAway, double oddsDraw) {
+            this.timeLabel = timeLabel;
+            this.timestampRecord = timestampRecord;
+            this.oddsHome = oddsHome;
+            this.oddsAway = oddsAway;
+            this.oddsDraw = oddsDraw;
+        }
     }
 
     @PostConstruct
@@ -147,46 +167,35 @@ public class MatchDataService {
 
         String bestMatch = normalized;
         int longestMatchLength = 0;
-
         for (Map.Entry<String, String> entry : specificReplacements.entrySet()) {
             if (normalized.contains(entry.getKey()) && entry.getKey().length() > longestMatchLength) {
                 bestMatch = entry.getValue();
                 longestMatchLength = entry.getKey().length();
             }
         }
-        if (longestMatchLength > 0) {
-            normalized = bestMatch;
-        }
+        if (longestMatchLength > 0) normalized = bestMatch;
 
         normalized = normalized.replaceAll("\\s*fc\\s*|\\s*cf\\s*|\\s*ud\\s*|\\s*rcd\\s*|\\s*cd\\s*|\\s*sad\\s*|\\s*de\\s*|\\s*club\\s*|\\s*futbol\\s*", "");
         normalized = normalized.replaceAll("[^a-z0-9]", "");
 
-        if (normalized.trim().isEmpty()) {
-            return "unknownteamnorm" + UUID.randomUUID().toString().substring(0, 4);
-        }
+        if (normalized.trim().isEmpty()) return "unknownteamnorm" + UUID.randomUUID().toString().substring(0, 4);
         return normalized;
     }
 
-    @Scheduled(fixedDelayString = "PT5S") // Frecuencia de polling
+    @Scheduled(fixedDelayString = "PT5S")
     public void scheduledDataMartUpdate() {
-        logger.info("Scheduled DataMart update initiated...");
         updateCurrentDailyEventFilePaths();
-
         boolean oddsFileChanged = hasFileChanged(this.currentDailyOddsStatusFilePath, this.lastOddsStatusFileReadTimestamp);
         boolean apiFileChanged = hasFileChanged(this.currentDailyMatchApiFilePath, this.lastMatchApiFileReadTimestamp);
-        boolean statusesRefreshedAndChanged = refreshMatchStatuses(); // Llama a refresh y captura si hubo cambios
-
+        boolean statusesRefreshedAndChanged = refreshMatchStatusesGlobally();
         if (oddsFileChanged || apiFileChanged || statusesRefreshedAndChanged) {
-            logger.info("Change detected or statuses updated. OddsFileChanged: {}, ApiFileChanged: {}, StatusesRefreshedAndChanged: {}. Rebuilding DataMart.", oddsFileChanged, apiFileChanged, statusesRefreshedAndChanged);
             if (oddsFileChanged && this.currentDailyOddsStatusFilePath != null && Files.exists(this.currentDailyOddsStatusFilePath)) {
                 try { this.lastOddsStatusFileReadTimestamp = Files.getLastModifiedTime(this.currentDailyOddsStatusFilePath); } catch (IOException e) {logger.error("Error updating odds file timestamp for {}: {}",this.currentDailyOddsStatusFilePath, e.getMessage());}
             }
             if (apiFileChanged && this.currentDailyMatchApiFilePath != null && Files.exists(this.currentDailyMatchApiFilePath)) {
                 try { this.lastMatchApiFileReadTimestamp = Files.getLastModifiedTime(this.currentDailyMatchApiFilePath); } catch (IOException e) {logger.error("Error updating api file timestamp for {}: {}", this.currentDailyMatchApiFilePath, e.getMessage());}
             }
-            buildAndBroadcastAndStoreDataMart(); // Esto ya implica un sseService.sendUpdate si la caché cambia
-        } else {
-            logger.trace("No changes detected in daily datalake files and no status changes from refresh.");
+            buildAndBroadcastAndStoreDataMart();
         }
     }
 
@@ -195,10 +204,7 @@ public class MatchDataService {
         try {
             FileTime currentModTime = Files.getLastModifiedTime(filePath);
             return lastReadTime == null || currentModTime.compareTo(lastReadTime) > 0;
-        } catch (IOException e) {
-            logger.error("Error checking file modification time for {}: {}", filePath, e.getMessage());
-            return false;
-        }
+        } catch (IOException e) { return false; }
     }
 
     private void buildAndBroadcastAndStoreDataMart() {
@@ -212,11 +218,7 @@ public class MatchDataService {
                     return null;
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(
-                        NormalizedApiDTO::getNormalizedKey,
-                        NormalizedApiDTO::getDto,
-                        (apiDtoValue1, apiDtoValue2) -> apiDtoValue2
-                ));
+                .collect(Collectors.toMap( NormalizedApiDTO::getNormalizedKey, NormalizedApiDTO::getDto, (apiDtoValue1, apiDtoValue2) -> apiDtoValue2 ));
 
         List<MatchEvent> newCache = new ArrayList<>();
         if (oddsStatusDTOs.isEmpty() && !matchApiDTOs.isEmpty()) {
@@ -227,8 +229,7 @@ public class MatchDataService {
                 String awayLogo = generateLogoUrlFromName(apiDto.getAwayTeam());
                 ZonedDateTime ts = DateTimeUtil.parseCustomDateTime(apiDto.getDateTime());
                 if (ts == null) ts = ZonedDateTime.now(ZoneId.systemDefault());
-                MatchEvent event = new MatchEvent(ts, apiDto.getDateTime(),0, apiDto.getAwayTeam(),0, apiDto.getHomeTeam(),
-                        "Datalake_API_Only", 0, MatchStatus.SCHEDULED, homeLogo, awayLogo);
+                MatchEvent event = new MatchEvent(ts, apiDto.getDateTime(),0, apiDto.getAwayTeam(),0, apiDto.getHomeTeam(), "Datalake_API_Only", 0, MatchStatus.SCHEDULED, homeLogo, awayLogo);
                 event.setStadium(apiDto.getStadium());
                 event.setReferee(apiDto.getReferee());
                 event.setOddsSource("Betfair");
@@ -237,9 +238,7 @@ public class MatchDataService {
         } else {
             for (MatchEventDTO oddsDto : oddsStatusDTOs) {
                 String normalizedHomeKey = normalizeTeamNameForKey(oddsDto.getTeamHome());
-                if (normalizedHomeKey == null || normalizedHomeKey.startsWith("unknown")) {
-                    continue;
-                }
+                if (normalizedHomeKey == null || normalizedHomeKey.startsWith("unknown")) continue;
                 MatchApiDataDTO apiData = apiDataMapByNormalizedHomeTeam.get(normalizedHomeKey);
                 ZonedDateTime ts = oddsDto.getTimeStamp() != null ? oddsDto.getTimeStamp() : ZonedDateTime.now(ZoneId.systemDefault());
                 MatchStatus status = determineStatusFromDateTimeString(oddsDto.getDateTime(), ts);
@@ -250,13 +249,8 @@ public class MatchDataService {
                         oddsDto.getOddsAway() != null ? oddsDto.getOddsAway() : 0.0, oddsDto.getTeamHome(),
                         "Datalake_Consolidated", oddsDto.getOddsHome() != null ? oddsDto.getOddsHome() : 0.0,
                         status, homeLogo, awayLogo);
-
-                if (status == MatchStatus.LIVE) { // Si el estado es LIVE
-                    event.setLiveTimeDisplay(oddsDto.getDateTime()); // Asumimos que dto.getDateTime() es "23'" o similar
-                } else {
-                    event.setLiveTimeDisplay(null); // Asegurar que no haya liveTimeDisplay si no está en vivo
-                }
-
+                if (status == MatchStatus.LIVE) event.setLiveTimeDisplay(oddsDto.getDateTime());
+                else event.setLiveTimeDisplay(null);
                 if (apiData != null) {
                     event.setStadium(apiData.getStadium());
                     event.setReferee(apiData.getReferee());
@@ -272,17 +266,14 @@ public class MatchDataService {
                 this.matchEventsCache.clear();
                 this.matchEventsCache.addAll(newCache);
                 cacheEffectivelyChanged = true;
-                logger.info("DataMart cache rebuilt/updated. New size: {}.", this.matchEventsCache.size());
             } else {
                 cacheEffectivelyChanged = false;
-                logger.info("DataMart rebuilt, but no effective changes to the cache.");
             }
         }
 
         if (cacheEffectivelyChanged) {
             writeDatamartToFile(this.matchEventsCache);
             sseService.sendUpdate(new ArrayList<>(this.matchEventsCache));
-            logger.info("SSE update sent due to DataMart change.");
         }
     }
 
@@ -295,14 +286,10 @@ public class MatchDataService {
     }
 
     private void writeDatamartToFile(List<MatchEvent> datamartEvents) {
-        if (this.currentDailyDataMartFilePath == null) {
-            logger.error("Daily datamart file path is not set. Cannot write datamart.");
-            return;
-        }
+        if (this.currentDailyDataMartFilePath == null) return;
         try {
             String jsonDatamart = objectMapper.writeValueAsString(datamartEvents);
-            Files.writeString(this.currentDailyDataMartFilePath, jsonDatamart, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            Files.writeString(this.currentDailyDataMartFilePath, jsonDatamart, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
         } catch (IOException e) {
             logger.error("Error writing DataMart to file {}: {}", this.currentDailyDataMartFilePath, e.getMessage(), e);
         }
@@ -310,9 +297,7 @@ public class MatchDataService {
 
     private boolean areMatchEventListsEffectivelyEqual(List<MatchEvent> list1, List<MatchEvent> list2) {
         if (list1.size() != list2.size()) return false;
-        Map<String, MatchEvent> map1 = list1.stream()
-                .filter(e -> e.getId() != null)
-                .collect(Collectors.toMap(MatchEvent::getId, Function.identity(), (e1, e2) -> e1));
+        Map<String, MatchEvent> map1 = list1.stream().filter(e -> e.getId() != null).collect(Collectors.toMap(MatchEvent::getId, Function.identity(), (e1, e2) -> e1));
         for (MatchEvent event2 : list2) {
             if (event2.getId() == null) return false;
             MatchEvent event1 = map1.get(event2.getId());
@@ -336,9 +321,7 @@ public class MatchDataService {
     }
 
     private <T> List<T> readLastJsonArrayFromFile(Path filePath, TypeReference<List<T>> typeReference) {
-        if (filePath == null || !Files.exists(filePath)) {
-            return List.of();
-        }
+        if (filePath == null || !Files.exists(filePath)) return List.of();
         try {
             List<String> lines = Files.readAllLines(filePath);
             if (!lines.isEmpty()) {
@@ -354,15 +337,66 @@ public class MatchDataService {
         return List.of();
     }
 
+    public List<OddsHistoryPoint> getOddsHistoryForMatch(String targetTeamHome, String targetTeamAway, String originalMatchDateTimeString) {
+        List<OddsHistoryPoint> history = new ArrayList<>();
+        if (this.currentDailyOddsStatusFilePath == null || !Files.exists(this.currentDailyOddsStatusFilePath)) {
+            logger.warn("Daily odds/status event file not found for history: {}", this.currentDailyOddsStatusFilePath);
+            return history;
+        }
+
+        ZonedDateTime matchStartTimeForDate = DateTimeUtil.parseCustomDateTime(originalMatchDateTimeString);
+        LocalDate matchDate = (matchStartTimeForDate != null) ? matchStartTimeForDate.toLocalDate() : LocalDate.now(ZoneId.systemDefault());
+
+        logger.info("Fetching odds history for Home: {}, Away: {}, on Date: {}", targetTeamHome, targetTeamAway, matchDate);
+
+        try (Stream<String> linesStream = Files.lines(this.currentDailyOddsStatusFilePath, StandardCharsets.UTF_8)) {
+            linesStream.filter(line -> !line.trim().isEmpty()).forEach(line -> {
+                try {
+                    List<MatchEventDTO> dtosInLine = objectMapper.readValue(line, new TypeReference<List<MatchEventDTO>>() {});
+                    for (MatchEventDTO dto : dtosInLine) {
+                        if (targetTeamHome.equalsIgnoreCase(dto.getTeamHome()) &&
+                                (targetTeamAway == null || targetTeamAway.equalsIgnoreCase(dto.getTeamAway()))) { // Hacer awayTeam opcional si no siempre está
+
+                            ZonedDateTime dtoEventTime = dto.getTimeStamp() != null ? dto.getTimeStamp() : ZonedDateTime.now(ZoneId.systemDefault());
+                            // Comprobar si el DTO es del mismo día del partido o si es un tiempo en vivo (que asumimos es del día)
+                            boolean isSameDayOrLive = false;
+                            ZonedDateTime dtoMatchTimeForDate = DateTimeUtil.parseCustomDateTime(dto.getDateTime());
+                            if (LIVE_TIME_PATTERN.matcher(dto.getDateTime()).matches()) {
+                                isSameDayOrLive = true; // Tiempo en vivo es del partido actual
+                            } else if (dtoMatchTimeForDate != null && dtoMatchTimeForDate.toLocalDate().equals(matchDate)) {
+                                isSameDayOrLive = true; // Hora de inicio programada del mismo día
+                            }
+
+                            if (isSameDayOrLive) {
+                                history.add(new OddsHistoryPoint(
+                                        dto.getDateTime(),
+                                        dtoEventTime,
+                                        dto.getOddsHome() != null ? dto.getOddsHome() : 0,
+                                        dto.getOddsAway() != null ? dto.getOddsAway() : 0,
+                                        dto.getOddsDraw() != null ? dto.getOddsDraw() : 0
+                                ));
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error("Error parsing JSON line for odds history: '{}'. Error: {}", line, e.getMessage());
+                }
+            });
+        } catch (IOException e) {
+            logger.error("Error reading daily odds/status event file for history: {}", this.currentDailyOddsStatusFilePath, e);
+        }
+        history.sort(Comparator.comparing(OddsHistoryPoint::getTimestampRecord));
+        return history;
+    }
+
+
     private String generateLogoUrlFromName(String teamName) {
         if (teamName == null || teamName.trim().isEmpty()) return "/images/logos/default_logo.png";
         return "/images/logos/" + teamName.replace(" ", "_") + ".png";
     }
 
     private MatchStatus determineStatusFromDateTimeString(String dateTimeString, ZonedDateTime eventTimestampForFallback) {
-        if (dateTimeString != null && LIVE_TIME_PATTERN.matcher(dateTimeString).matches()) {
-            return MatchStatus.LIVE;
-        }
+        if (dateTimeString != null && LIVE_TIME_PATTERN.matcher(dateTimeString).matches()) return MatchStatus.LIVE;
         ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime matchStartTime = DateTimeUtil.parseCustomDateTime(dateTimeString);
         if (matchStartTime == null) {
@@ -376,18 +410,11 @@ public class MatchDataService {
     public synchronized void processRealtimeEvent(MatchEvent eventDataFromMQ) {
         MatchStatus determinedStatus = determineStatusFromDateTimeString(eventDataFromMQ.getDateTimeString(), eventDataFromMQ.getTimeStamp());
         eventDataFromMQ.setMatchStatus(determinedStatus);
-        if (determinedStatus == MatchStatus.LIVE) {
-            eventDataFromMQ.setLiveTimeDisplay(eventDataFromMQ.getDateTimeString());
-        } else {
-            eventDataFromMQ.setLiveTimeDisplay(null);
-        }
+        if (determinedStatus == MatchStatus.LIVE) eventDataFromMQ.setLiveTimeDisplay(eventDataFromMQ.getDateTimeString());
+        else eventDataFromMQ.setLiveTimeDisplay(null);
 
-        if (eventDataFromMQ.getHomeTeamLogoUrl() == null && eventDataFromMQ.getTeamHome() != null) {
-            eventDataFromMQ.setHomeTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamHome()));
-        }
-        if (eventDataFromMQ.getAwayTeamLogoUrl() == null && eventDataFromMQ.getTeamAway() != null) {
-            eventDataFromMQ.setAwayTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamAway()));
-        }
+        if (eventDataFromMQ.getHomeTeamLogoUrl() == null && eventDataFromMQ.getTeamHome() != null) eventDataFromMQ.setHomeTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamHome()));
+        if (eventDataFromMQ.getAwayTeamLogoUrl() == null && eventDataFromMQ.getTeamAway() != null) eventDataFromMQ.setAwayTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamAway()));
 
         String matchKey = generateMatchKeyFromEvent(eventDataFromMQ);
         Optional<MatchEvent> cachedEventOpt = matchEventsCache.stream().filter(e -> matchKey.equals(generateMatchKeyFromEvent(e))).findFirst();
@@ -397,10 +424,7 @@ public class MatchDataService {
             if (cachedEvent.getReferee() != null) eventDataFromMQ.setReferee(cachedEvent.getReferee());
         }
 
-        boolean changed = updateOrAddByMatchKey(matchKey, eventDataFromMQ, true);
-        if(changed) {
-            logger.info("Cache updated by MQ event for key {}. SSE will be sent by listener.", matchKey);
-        }
+        updateOrAddByMatchKey(matchKey, eventDataFromMQ, true);
     }
 
     private String generateMatchKeyFromEvent(MatchEvent event) {
@@ -427,13 +451,12 @@ public class MatchDataService {
                 if (newData.getReferee() != null && !Objects.equals(existing.getReferee(), newData.getReferee())) { existing.setReferee(newData.getReferee()); changed = true;}
                 if (!Objects.equals(existing.getOddsSource(), newData.getOddsSource())) { existing.setOddsSource(newData.getOddsSource()); changed = true;}
                 existing.setSource(newData.getSource());
-                if (changed) logger.info("Updated existing MatchEvent with key {} from source {}", matchKey, newData.getSource());
             }
         } else {
             matchEventsCache.add(newData);
-            logger.info("Added new MatchEvent with key {} from source {}", matchKey, newData.getSource());
             changed = true;
         }
+        if (changed) logger.info("Cache updated/added for key {} from source {}. New event status: {}", matchKey, newData.getSource(), newData.getMatchStatus());
         return changed;
     }
 
@@ -460,29 +483,25 @@ public class MatchDataService {
         return safeHomeTeam + "|" + safeAwayTeam + "|" + dateComponent;
     }
 
-    private boolean refreshMatchStatuses() { // Devuelve true si algún estado cambió
+    private boolean refreshMatchStatusesGlobally() {
         boolean changedOverall = false;
         synchronized (this.matchEventsCache) {
             for (MatchEvent event : this.matchEventsCache) {
                 MatchStatus oldStatus = event.getMatchStatus();
                 String oldLiveDisplay = event.getLiveTimeDisplay();
-
                 MatchStatus newStatus = determineStatusFromDateTimeString(event.getDateTimeString(), event.getTimeStamp());
                 if (oldStatus != newStatus) {
                     event.setMatchStatus(newStatus);
                     changedOverall = true;
-                    logger.debug("Status changed for {}: {} -> {}", event.getId(), oldStatus, newStatus);
                 }
-
                 if (newStatus == MatchStatus.LIVE) {
-                    String currentDateTimeString = event.getDateTimeString(); // Este es el que tiene "23'"
+                    String currentDateTimeString = event.getDateTimeString();
                     if (currentDateTimeString != null && LIVE_TIME_PATTERN.matcher(currentDateTimeString).matches()) {
                         if (!Objects.equals(currentDateTimeString, oldLiveDisplay)) {
                             event.setLiveTimeDisplay(currentDateTimeString);
                             changedOverall = true;
-                            logger.debug("LiveTimeDisplay updated for {}: {}", event.getId(), currentDateTimeString);
                         }
-                    } else if (oldLiveDisplay == null) { // Si es LIVE pero no hay formato de tiempo
+                    } else if (oldLiveDisplay == null) {
                         event.setLiveTimeDisplay("En Directo");
                         changedOverall = true;
                     }
@@ -494,26 +513,13 @@ public class MatchDataService {
                 }
             }
         }
-        if (changedOverall) logger.info("Match statuses refreshed, changes detected in cache.");
+        if (changedOverall) logger.info("Match statuses refreshed globally, changes detected in cache.");
         return changedOverall;
     }
 
-    public List<MatchEvent> getLiveMatches() {
-        refreshMatchStatuses(); // Asegurar que los estados estén al día
-        synchronized (this.matchEventsCache) {
-            return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.LIVE).collect(Collectors.toList());
-        }
-    }
-    public List<MatchEvent> getUpcomingMatches() {
-        refreshMatchStatuses(); // Asegurar que los estados estén al día
-        synchronized (this.matchEventsCache) {
-            return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.UPCOMING || e.getMatchStatus() == MatchStatus.SCHEDULED).sorted((e1,e2)->{
-                ZonedDateTime d1=DateTimeUtil.parseCustomDateTime(e1.getDateTimeString()),d2=DateTimeUtil.parseCustomDateTime(e2.getDateTimeString());
-                if(d1==null&&d2==null)return 0;if(d1==null)return 1;if(d2==null)return -1;return d1.compareTo(d2);
-            }).collect(Collectors.toList());
-        }
-    }
-    public List<MatchEvent> getHistoricalMatches() { refreshMatchStatuses(); synchronized (this.matchEventsCache) { return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.HISTORICAL).sorted((e1,e2)->{ ZonedDateTime d1=DateTimeUtil.parseCustomDateTime(e1.getDateTimeString()),d2=DateTimeUtil.parseCustomDateTime(e2.getDateTimeString()); if(d1==null&&d2==null)return 0;if(d1==null)return 1;if(d2==null)return -1;return d2.compareTo(d1); }).collect(Collectors.toList()); } }
-    public List<MatchEvent> getAllMatchEvents() { refreshMatchStatuses(); synchronized (this.matchEventsCache) { return new ArrayList<>(this.matchEventsCache); } }
-    public Optional<MatchEvent> getMatchEventById(String id) { if(id==null||id.trim().isEmpty())return Optional.empty();refreshMatchStatuses();synchronized(this.matchEventsCache){return matchEventsCache.stream().filter(e->Objects.equals(id,e.getId())).findFirst();} }
+    public List<MatchEvent> getLiveMatches() { refreshMatchStatusesGlobally(); synchronized (this.matchEventsCache) { return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.LIVE).collect(Collectors.toList()); } }
+    public List<MatchEvent> getUpcomingMatches() { refreshMatchStatusesGlobally(); synchronized (this.matchEventsCache) { return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.UPCOMING || e.getMatchStatus() == MatchStatus.SCHEDULED).sorted((e1,e2)->{ ZonedDateTime d1=DateTimeUtil.parseCustomDateTime(e1.getDateTimeString()),d2=DateTimeUtil.parseCustomDateTime(e2.getDateTimeString()); if(d1==null&&d2==null)return 0;if(d1==null)return 1;if(d2==null)return -1;return d1.compareTo(d2); }).collect(Collectors.toList()); } }
+    public List<MatchEvent> getHistoricalMatches() { refreshMatchStatusesGlobally(); synchronized (this.matchEventsCache) { return matchEventsCache.stream().filter(e->e.getMatchStatus() == MatchStatus.HISTORICAL).sorted((e1,e2)->{ ZonedDateTime d1=DateTimeUtil.parseCustomDateTime(e1.getDateTimeString()),d2=DateTimeUtil.parseCustomDateTime(e2.getDateTimeString()); if(d1==null&&d2==null)return 0;if(d1==null)return 1;if(d2==null)return -1;return d2.compareTo(d1); }).collect(Collectors.toList()); } }
+    public List<MatchEvent> getAllMatchEvents() { refreshMatchStatusesGlobally(); synchronized (this.matchEventsCache) { return new ArrayList<>(this.matchEventsCache); } }
+    public Optional<MatchEvent> getMatchEventById(String id) { if(id==null||id.trim().isEmpty())return Optional.empty();refreshMatchStatusesGlobally();synchronized(this.matchEventsCache){return matchEventsCache.stream().filter(e->Objects.equals(id,e.getId())).findFirst();} }
 }
