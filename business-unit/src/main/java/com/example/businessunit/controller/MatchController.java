@@ -50,24 +50,13 @@ public class MatchController {
             MatchEvent selectedMatch = selectedMatchOpt.get();
             model.addAttribute("selectedMatch", selectedMatch);
 
-            // Lógica para generar URLs de logo para el selectedMatch
-            // Esta lógica se ejecutará siempre para el selectedMatch, asegurando
-            // que 'homeLogo' y 'awayLogo' se añaden al modelo.
-            if (selectedMatch.getTeamHome() != null) {
-                String homeLogoFileName = selectedMatch.getTeamHome().replace(" ", "_") + ".png";
-                model.addAttribute("homeLogo", "/images/logos/" + homeLogoFileName);
-            } else {
-                model.addAttribute("homeLogo", null); // O una URL de logo por defecto
+            if (selectedMatch.getHomeTeamLogoUrl() == null && selectedMatch.getTeamHome() != null) {
+                model.addAttribute("homeLogo", "/images/logos/" + selectedMatch.getTeamHome().replace(" ", "_") + ".png");
+            }
+            if (selectedMatch.getAwayTeamLogoUrl() == null && selectedMatch.getTeamAway() != null) {
+                model.addAttribute("awayLogo", "/images/logos/" + selectedMatch.getTeamAway().replace(" ", "_") + ".png");
             }
 
-            if (selectedMatch.getTeamAway() != null) {
-                String awayLogoFileName = selectedMatch.getTeamAway().replace(" ", "_") + ".png";
-                model.addAttribute("awayLogo", "/images/logos/" + awayLogoFileName);
-            } else {
-                model.addAttribute("awayLogo", null); // O una URL de logo por defecto
-            }
-
-            // Lógica para "Otros Partidos" (esto ya debería funcionar si los datos son correctos)
             List<MatchEvent> allPotentiallyRelevantMatches = matchDataService.getAllMatchEvents();
             List<MatchEvent> otherMatchesList = allPotentiallyRelevantMatches.stream()
                     .filter(match -> !match.getId().equals(idDelPartido))

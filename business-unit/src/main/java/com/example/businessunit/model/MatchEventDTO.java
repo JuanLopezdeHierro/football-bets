@@ -8,14 +8,14 @@ import java.time.ZonedDateTime;
 
 @Getter
 @Setter
-@NoArgsConstructor // Constructor por defecto requerido por Jackson
+@NoArgsConstructor
 public class MatchEventDTO {
 
     @JsonProperty("timeStamp")
     private ZonedDateTime timeStamp;
 
     @JsonProperty("dateTime")
-    private String dateTime; // Este será el dateTimeString en MatchEvent
+    private String dateTime;
 
     @JsonProperty("oddsDraw")
     private Double oddsDraw;

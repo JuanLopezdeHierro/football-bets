@@ -21,8 +21,12 @@
                 class="match-card live-match">
                 <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
                     <div class="team-info-overview">
+                        <img th:if="${match.homeTeamLogoUrl != null}" th:src="@{${match.homeTeamLogoUrl}}" th:alt="${match.teamHome}" class="team-logo-small"/>
+                        <i th:unless="${match.homeTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
                         <span class="team-name" th:text="${match.teamHome}"></span>
                         <span class="vs-separator">VS</span>
+                        <img th:if="${match.awayTeamLogoUrl != null}" th:src="@{${match.awayTeamLogoUrl}}" th:alt="${match.teamAway}" class="team-logo-small"/>
+                        <i th:unless="${match.awayTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
                         <span class="team-name" th:text="${match.teamAway}"></span>
                     </div>
                     <span class="match-time-overview"
@@ -40,24 +44,29 @@
 
     <div class="matches-section upcoming-section">
         <h2>PRÓXIMOS PARTIDOS</h2>
-        <ul id="upcoming-match-list" class="match-list" th:if="${not #lists.isEmpty(upcomingMatches)}">
+        <ul id="upcoming-match-list" class="match-list">
             <li th:each="match : ${upcomingMatches}"
                 th:id="'match-' + ${match.id}"
                 class="match-card upcoming-match">
                 <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
                     <div class="team-info-overview">
+                        <img th:if="${match.homeTeamLogoUrl != null}" th:src="@{${match.homeTeamLogoUrl}}" th:alt="${match.teamHome}" class="team-logo-small"/>
+                        <i th:unless="${match.homeTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
                         <span class="team-name" th:text="${match.teamHome}"></span>
                         <span class="vs-separator">VS</span>
+                        <img th:if="${match.awayTeamLogoUrl != null}" th:src="@{${match.awayTeamLogoUrl}}" th:alt="${match.teamAway}" class="team-logo-small"/>
+                        <i th:unless="${match.awayTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
                         <span class="team-name" th:text="${match.teamAway}"></span>
                     </div>
                     <span class="match-time-overview"
-                          th:if="${match.dateTimeString}"
-                          th:text="${match.dateTimeString}">
+                          th:text="${match.dateTimeString != null ? match.dateTimeString : '--:--'}">
                     </span>
                 </a>
             </li>
         </ul>
-        <div th:if="${#lists.isEmpty(upcomingMatches)}" class="no-matches-message">
+        <div id="no-upcoming-matches-message" class="no-matches-message"
+             th:classappend="${not #lists.isEmpty(upcomingMatches)} ? 'hidden' : ''"
+             th:if="${#lists.isEmpty(upcomingMatches)}">
             <i class="fas fa-calendar-alt"></i>
             <p>No hay próximos partidos programados.</p>
         </div>
@@ -65,97 +74,115 @@
 </div>
 
 <script th:inline="javascript">
-    // Suscripción SSE: actualiza cada partido sin recarga
-    const evtSrc = new EventSource('/matches/stream');
+    /*<![CDATA[*/
+    const sseStreamUrlOverview = /*[[@{/matches/stream}]]*/ '/matches/stream';
+    const matchDetailBaseUrlOverview = /*[[@{/laliga/match/}]]*/ '/laliga/match/';
+    /*]]>*/
 
-    evtSrc.onmessage = function(event) { // Puedes usar onmessage para capturar todos los eventos sin nombre específico
+    const evtSrcOverview = new EventSource(sseStreamUrlOverview);
+
+    evtSrcOverview.onmessage = function(event) {
         const updatedMatches = JSON.parse(event.data);
-        let hasLiveMatchesNow = false;
+        let liveMatchesInDOMCount = 0;
+        let upcomingMatchesInDOMCount = 0;
 
+        // Primero, actualiza o crea elementos de partido
         updatedMatches.forEach(match => {
-            if (match.matchStatus === 'LIVE') {
-                hasLiveMatchesNow = true;
-            }
-
             let matchElement = document.getElementById('match-' + match.id);
             const liveMatchList = document.getElementById('live-match-list');
             const upcomingMatchList = document.getElementById('upcoming-match-list');
 
-            // Determinar el texto del tiempo/estado
             let timeText = '';
-            if (match.matchStatus === 'LIVE') {
+            const matchStatusStr = match.matchStatus.name || match.matchStatus; // Para manejar Enum o String
+
+            if (matchStatusStr === 'LIVE') {
                 timeText = match.liveTimeDisplay || match.dateTimeString || 'En vivo';
-            } else { // UPCOMING or FINISHED (ajusta según tus estados)
+            } else {
                 timeText = match.dateTimeString || 'Próximamente';
             }
 
-            // Si el elemento del partido existe, actualizarlo
-            if (matchElement) {
-                const timeSpan = matchElement.querySelector('.match-time-overview');
-                if (timeSpan) {
-                    timeSpan.textContent = timeText;
-                }
-                // Podrías querer mover el elemento entre listas si su estado cambia (ej. de upcoming a live)
-                // Esto es más complejo y requeriría quitar y añadir el elemento al DOM en la lista correcta.
-                // Por ahora, solo actualizamos el contenido y la clase.
+            if (!matchElement) {
+                matchElement = document.createElement('li');
+                matchElement.id = 'match-' + match.id;
+                matchElement.classList.add('match-card');
 
-                // Asegurar que tenga la clase correcta (live-match o upcoming-match)
-                if (match.matchStatus === 'LIVE') {
-                    if (!matchElement.classList.contains('live-match')) {
-                        matchElement.classList.remove('upcoming-match'); // Si estaba en upcoming
-                        matchElement.classList.add('live-match');
-                        // Mover al DOM de la lista de live si es necesario
-                        if (liveMatchList && matchElement.parentElement !== liveMatchList) {
-                            liveMatchList.appendChild(matchElement);
-                        }
-                    }
-                } else { // Si no es LIVE (asumimos UPCOMING o similar para la lista de próximos)
-                    if (!matchElement.classList.contains('upcoming-match')) {
-                        matchElement.classList.remove('live-match');
-                        matchElement.classList.add('upcoming-match');
-                        // Mover al DOM de la lista de upcoming si es necesario
-                        if (upcomingMatchList && matchElement.parentElement !== upcomingMatchList) {
-                            upcomingMatchList.appendChild(matchElement);
-                        }
-                    }
-                }
+                const link = document.createElement('a');
+                link.href = matchDetailBaseUrlOverview + match.id;
 
-                // Aplicar animación de resaltado
-                matchElement.classList.add('highlight-update');
-                setTimeout(() => {
-                    if (matchElement) matchElement.classList.remove('highlight-update');
-                }, 1000);
+                const teamInfoDiv = document.createElement('div');
+                teamInfoDiv.classList.add('team-info-overview');
 
+                const homeLogoHtml = match.homeTeamLogoUrl ? `<img src="${match.homeTeamLogoUrl}" alt="${match.teamHome || ''}" class="team-logo-small"/>` : '<i class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>';
+                const homeTeamHtml = `<span class="team-name">${match.teamHome || ''}</span>`;
+                const vsSeparatorHtml = '<span class="vs-separator">VS</span>';
+                const awayLogoHtml = match.awayTeamLogoUrl ? `<img src="${match.awayTeamLogoUrl}" alt="${match.teamAway || ''}" class="team-logo-small"/>` : '<i class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>';
+                const awayTeamHtml = `<span class="team-name">${match.teamAway || ''}</span>`;
+                teamInfoDiv.innerHTML = homeLogoHtml + homeTeamHtml + vsSeparatorHtml + awayLogoHtml + awayTeamHtml;
+
+                const timeSpan = document.createElement('span');
+                timeSpan.classList.add('match-time-overview');
+
+                link.appendChild(teamInfoDiv);
+                link.appendChild(timeSpan);
+                matchElement.appendChild(link);
+            }
+
+            const timeSpanInElement = matchElement.querySelector('.match-time-overview');
+            if (timeSpanInElement) timeSpanInElement.textContent = timeText;
+
+            const currentParentList = matchElement.parentElement;
+
+            if (matchStatusStr === 'LIVE') {
+                matchElement.classList.remove('upcoming-match');
+                matchElement.classList.add('live-match');
+                if (liveMatchList && currentParentList !== liveMatchList) liveMatchList.appendChild(matchElement);
+            } else if (matchStatusStr === 'UPCOMING' || matchStatusStr === 'SCHEDULED') {
+                matchElement.classList.remove('live-match');
+                matchElement.classList.add('upcoming-match');
+                if (upcomingMatchList && currentParentList !== upcomingMatchList) upcomingMatchList.appendChild(matchElement);
             } else {
-                // Si el elemento no existe, podría ser un nuevo partido. Habría que crearlo y añadirlo.
-                // Esta lógica puede ser compleja y depende de si esperas nuevos partidos vía SSE.
-                // console.log('Nuevo partido recibido, se necesita lógica para crearlo:', match);
+                if (currentParentList) matchElement.remove();
+            }
+
+            if (document.body.contains(matchElement)) {
+                matchElement.classList.add('highlight-update');
+                setTimeout(() => { if (matchElement) matchElement.classList.remove('highlight-update'); }, 1000);
             }
         });
 
-        // Gestionar visibilidad de la sección EN DIRECTO
+        // Segundo, cuenta y actualiza la visibilidad de las secciones
+        const liveMatchListEl = document.getElementById('live-match-list');
+        const upcomingMatchListEl = document.getElementById('upcoming-match-list');
+        if (liveMatchListEl) liveMatchesInDOMCount = liveMatchListEl.getElementsByTagName('li').length;
+        if (upcomingMatchListEl) upcomingMatchesInDOMCount = upcomingMatchListEl.getElementsByTagName('li').length;
+
         const liveSection = document.getElementById('live-matches-section');
         const noLiveMessage = document.getElementById('no-live-matches-message');
-        const liveList = document.getElementById('live-match-list');
+        if (liveSection && noLiveMessage) {
+            if (liveMatchesInDOMCount > 0) {
+                liveSection.classList.remove('hidden');
+                noLiveMessage.classList.add('hidden');
+            } else {
+                liveSection.classList.add('hidden');
+                noLiveMessage.classList.remove('hidden');
+            }
+        }
 
-        // Verificar si hay elementos 'li' en la lista de partidos en vivo
-        const actualLiveMatchesInDOM = liveList ? liveList.getElementsByTagName('li').length > 0 : false;
-        // O usar hasLiveMatchesNow si confías en que el SSE te da el estado de todos los partidos relevantes
-
-        if (hasLiveMatchesNow || actualLiveMatchesInDOM) {
-            if (liveSection) liveSection.classList.remove('hidden');
-            if (noLiveMessage) noLiveMessage.classList.add('hidden');
-        } else {
-            if (liveSection) liveSection.classList.add('hidden');
-            if (noLiveMessage) noLiveMessage.classList.remove('hidden');
+        const noUpcomingMessage = document.getElementById('no-upcoming-matches-message');
+        if (noUpcomingMessage) {
+            if (upcomingMatchesInDOMCount > 0) {
+                noUpcomingMessage.classList.add('hidden');
+                if (upcomingMatchListEl) upcomingMatchListEl.classList.remove('hidden');
+            } else {
+                noUpcomingMessage.classList.remove('hidden');
+                if (upcomingMatchListEl) upcomingMatchListEl.classList.add('hidden');
+            }
         }
     };
 
-    evtSrc.onerror = function(err) {
-        console.error("EventSource failed:", err);
-        // Podrías querer cerrar y reabrir la conexión o mostrar un mensaje al usuario
+    evtSrcOverview.onerror = function(err) {
+        console.error("EventSource failed (overview):", err);
     };
-
 </script>
 </body>
 </html>

@@ -28,22 +28,20 @@ public class MatchSseService {
         emitter.onTimeout(() -> {
             logger.debug("SSE Emitter timed out: {}", emitter);
             emitters.remove(emitter);
-            emitter.complete(); // Asegurar que se complete en timeout
+            emitter.complete();
         });
         emitter.onError(ex -> {
-            logger.error("SSE Emitter error: {}", emitter, ex);
+            logger.error("SSE Emitter error for emitter: {}. Error: {}", emitter, ex.getMessage());
             emitters.remove(emitter);
-            // No es necesario llamar a complete() aquí ya que onCompletion se activará si la conexión se rompe.
         });
 
         emitters.add(emitter);
         logger.info("New SSE Emitter created. Total emitters: {}", emitters.size());
 
-        // Enviar un evento inicial de conexión si es necesario
         try {
             emitter.send(SseEmitter.event().name("connection-established").data("SSE connection established"));
         } catch (IOException e) {
-            logger.warn("Failed to send initial connection event to new emitter", e);
+            logger.warn("Failed to send initial connection event to new emitter. Removing. Error: {}", e.getMessage());
             emitters.remove(emitter);
         }
         return emitter;
@@ -51,40 +49,26 @@ public class MatchSseService {
 
     public void sendUpdate(Object data) {
         if (emitters.isEmpty()) {
-            // logger.trace("No active SSE emitters to send update to."); // Puede ser muy verboso
             return;
         }
         logger.debug("Sending update to {} SSE emitters.", emitters.size());
-
-        // Usar un iterador para permitir la eliminación segura durante la iteración
-        // Aunque CopyOnWriteArrayList es seguro para iterar mientras se modifica,
-        // eliminar explícitamente por índice o referencia después de un fallo es más claro.
-        List<SseEmitter> failedEmitters = null;
+        List<SseEmitter> failedEmitters = new ArrayList<>();
 
         for (SseEmitter emitter : emitters) {
             try {
                 SseEmitter.SseEventBuilder event = SseEmitter.event()
-                        .name("match-update") // Nombre del evento que el cliente JS escucha
+                        .name("match-update")
                         .data(data, MediaType.APPLICATION_JSON);
                 emitter.send(event);
-            } catch (IOException e) {
-                logger.warn("Failed to send update to an SSE emitter, scheduling for removal. Error: {}", e.getMessage());
-                if (failedEmitters == null) {
-                    failedEmitters = new ArrayList<>();
-                }
-                failedEmitters.add(emitter);
-            } catch (Exception e) { // Capturar otras posibles excepciones (ej. IllegalStateException si ya está completo)
-                logger.warn("Unexpected error sending update to an SSE emitter, scheduling for removal. Error: {}", e.getMessage());
-                if (failedEmitters == null) {
-                    failedEmitters = new ArrayList<>();
-                }
+            } catch (Exception e) { // Capturar Exception más genérica
+                logger.warn("Failed to send update to an SSE emitter (will be removed). Emitter: {}, Error: {}", emitter, e.getMessage());
                 failedEmitters.add(emitter);
             }
         }
 
-        if (failedEmitters != null) {
+        if (!failedEmitters.isEmpty()) {
             emitters.removeAll(failedEmitters);
-            logger.info("Removed {} failed SSE emitters. Total emitters: {}", failedEmitters.size(), emitters.size());
+            logger.info("Removed {} failed SSE emitters. Total emitters remaining: {}", failedEmitters.size(), emitters.size());
         }
     }
 }

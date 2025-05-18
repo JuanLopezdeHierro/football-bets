@@ -2,7 +2,6 @@ package com.example.businessunit.listener;
 
 import com.example.businessunit.model.MatchEvent;
 import com.example.businessunit.model.MatchEventDTO;
-// import com.example.businessunit.model.MatchStatus; // No es necesario determinar el estado aquí si MatchDataService lo hace
 import com.example.businessunit.service.MatchDataService;
 import com.example.businessunit.service.MatchSseService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -41,7 +40,7 @@ public class MatchTopicListener {
             logger.warn("Received non-TextMessage on Match_Topic: {}", message.getClass().getName());
             return;
         }
-        String json = ""; // Para logging en caso de error
+        String json = "";
         try {
             json = ((TextMessage) message).getText();
             logger.debug("Received JSON on Match_Topic: {}", json);
@@ -57,11 +56,8 @@ public class MatchTopicListener {
 
             boolean anyChangeProcessed = false;
             for (MatchEventDTO dto : dtos) {
-                // Convertir DTO a MatchEvent. MatchDataService se encargará de determinar el estado y logos.
-                // El constructor de MatchEvent ahora toma URLs de logo.
-                // Es importante que el DTO, o la lógica aquí, pueda proveerlas o generarlas.
-                String homeLogoUrl = generateLogoUrlFromName(dto.getTeamHome()); // O null si se maneja después
-                String awayLogoUrl = generateLogoUrlFromName(dto.getTeamAway()); // O null si se maneja después
+                String homeLogoUrl = generateLogoUrlFromName(dto.getTeamHome());
+                String awayLogoUrl = generateLogoUrlFromName(dto.getTeamAway());
 
                 MatchEvent event = new MatchEvent(
                         dto.getTimeStamp(),
@@ -70,17 +66,17 @@ public class MatchTopicListener {
                         dto.getTeamAway(),
                         dto.getOddsAway() != null ? dto.getOddsAway() : 0.0,
                         dto.getTeamHome(),
-                        "MQ_LIVE:" + (dto.getSource() != null ? dto.getSource() : "UnknownMQSource"), // Fuente más específica
+                        "MQ_LIVE:" + (dto.getSource() != null ? dto.getSource() : "UnknownMQSource"),
                         dto.getOddsHome() != null ? dto.getOddsHome() : 0.0,
-                        null, // Dejar que MatchDataService.processRealtimeEvent determine el estado inicial
+                        null,
                         homeLogoUrl,
                         awayLogoUrl
                 );
-                matchDataService.processRealtimeEvent(event); // processRealtimeEvent debería devolver si hubo cambio o no
-                anyChangeProcessed = true; // Asumimos que procesar implica un potencial cambio. Para ser más precisos, processRealtimeEvent podría devolver un booleano.
+                matchDataService.processRealtimeEvent(event);
+                anyChangeProcessed = true;
             }
 
-            if (anyChangeProcessed) { // Solo enviar SSE si algo se procesó
+            if (anyChangeProcessed) {
                 List<MatchEvent> snapshot = matchDataService.getAllMatchEvents();
                 sseService.sendUpdate(snapshot);
                 logger.debug("SSE update sent after processing MQ message.");
@@ -93,10 +89,9 @@ public class MatchTopicListener {
         }
     }
 
-    // Método duplicado de MatchDataService. Considera moverlo a una clase Util si se usa en múltiples sitios.
     private String generateLogoUrlFromName(String teamName) {
         if (teamName == null || teamName.trim().isEmpty()) {
-            return "/images/logos/default_logo.png"; // O null, o un logo por defecto real
+            return "/images/logos/default_logo.png";
         }
         return "/images/logos/" + teamName.replace(" ", "_") + ".png";
     }
