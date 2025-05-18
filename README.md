@@ -1,86 +1,52 @@
-# Football Data Scraping and API Project
+# ⚽ Football Bets Real-Time Odds Project
 
-This project performs football data scraping and combines it with data obtained from an API. The data is stored in an SQLite database and updated every 10 minutes.
+## 📌 1. Descripción del Proyecto y Propuesta de Valor
 
-## Requirements
+**Football Bets Real-Time Odds** es una aplicación web que permite visualizar en tiempo real información detallada sobre partidos de LaLiga: horarios, estado del partido, cuotas de apuestas, estadio, árbitro y más.
 
-- Java 11 or higher
-- Maven
-- API key for the football API
+### 🎯 Propuesta de Valor
 
-## Installation
+Ofrecer a aficionados y apostadores una plataforma clara, actualizada automáticamente, para tomar decisiones informadas o disfrutar del seguimiento en directo. Utiliza Server-Sent Events (SSE) para actualizaciones sin recargar la página.
 
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/JuanLopezdeHierro/football-bets.git
-    cd football-bets
-    ```
+---
 
-2. Build the project using Maven:
-    ```sh
-    mvn clean install
-    ```
+## 🧠 2. Justificación: APIs y DataMart
 
-## Usage
+### 🧩 Fuentes de Datos
 
-1. Run the application:
-    ```sh
-    mvn exec:java -Dexec.mainClass="org.sofing.Main"
-    ```
+- **Match_Topic**
+  - 📁 `datalake/eventstore/Match_Topic/default/YYYYMMDD.events`
+  - Incluye: cuotas, estado del partido, equipos.
+  - ✅ Datos en tiempo real y cruciales para la visualización.
+  
+- **MatchApi_Topic**
+  - 📁 `datalake/eventstore/MatchApi_Topic/default/YYYYMMDD.events`
+  - Incluye: estadio, árbitro, ronda.
+  - ✅ Datos estáticos que enriquecen la experiencia.
 
-2. Enter your API key when prompted:
-    ```sh
-    Please enter your API key: <your-api-key>
-    ```
+### 🧱 Estructura del DataMart
 
-The application will start downloading and storing data every 10 minutes.
+- **Caché en memoria** (`MatchDataService`)
+  - Lista `List<MatchEvent>` fusionada de ambas fuentes.
+  - Alta velocidad de acceso.
+- **Archivo persistente**
+  - 📁 `output_datamart/default/YYYYMMDD.datamart.json`
+  - Permite análisis offline, auditoría o reinicio de caché.
 
-## Project Structure
+🔑 **Clave de unión**: `homeTeam` normalizado + fecha.
 
-- `src/main/java/org/sofing/Main.java`: Main class that starts the application.
-- `src/main/java/org/sofing/control/Controller.java`: Controller that manages data downloading and storage.
-- `src/main/java/org/sofing/control/FootballApiClient.java`: Interface for the football API client.
-- `src/main/java/org/sofing/control/FootballApiClientImpl.java`: Implementation of the football API client.
-- `src/main/java/org/sofing/control/FootballWebScraping.java`: Interface for the web scraping.
-- `src/main/java/org/sofing/control/FootballWebScrapingImpl.java`: Implementation of the web scraping.
-- `src/main/java/org/sofing/control/DataStorage.java`: Interface for the SQLite database management.
-- `src/main/java/org/sofing/control/DataStorageImpl.java`: Implementation of the SQLite database management.
-- `src/main/java/org/sofing/model/Match.java`: Data model for football matches.
+---
 
-## Technical Details
+## ⚙️ 3. Instrucciones de Compilación y Ejecución
 
-### `Controller` Class
+### ✅ Requisitos
 
-Manages data downloading and storage every 10 minutes using a `ScheduledExecutorService`.
+- JDK 17+
+- Apache Maven 3.6+
+- Estructura esperada del datalake
 
-### `FootballApiClient` Interface
+### ▶️ Compilación
 
-Defines the method to update match fields using the football API.
-
-### `FootballApiClientImpl` Class
-
-Connects to the football API using the API key provided by the user and updates match data.
-
-### `FootballWebScraping` Interface
-
-Defines the method for web scraping.
-
-### `FootballWebScrapingImpl` Class
-
-Performs data scraping from a web source.
-
-### `DataStorage` Interface
-
-Defines the method to insert match data into the SQLite database.
-
-### `DataStorageImpl` Class
-
-Manages the SQLite database. Each time new data is inserted, the `matches` table is dropped and recreated.
-
-## Contributions
-
-Contributions are welcome. Please open an issue or a pull request to discuss any changes you wish to make.
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+```bash
+cd business-unit
+mvn clean package
