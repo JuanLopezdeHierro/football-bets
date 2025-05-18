@@ -5,24 +5,28 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import org.json.JSONArray;
 
 public class EventProvider {
-    private static String url = "tcp://localhost:61616";
-    private static String subject = "Match_Queue";
+    private final String url;
+    private final String subject;
+
+    public EventProvider(String url, String subject) {
+        this.url     = url;
+        this.subject = subject;
+    }
 
     public void matchInfoArray(JSONArray jsonArray) throws JMSException {
-        ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
-        Connection connection = connectionFactory.createConnection();
+        ConnectionFactory factory = new ActiveMQConnectionFactory(url);
+        Connection connection     = factory.createConnection();
         connection.start();
 
         Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
         Destination destination = session.createQueue(subject);
 
         MessageProducer producer = session.createProducer(destination);
+        TextMessage message      = session.createTextMessage(jsonArray.toString());
 
-        TextMessage message = session.createTextMessage(jsonArray.toString());
         producer.send(message);
+        System.out.println("Mensaje enviado a " + subject + ": " + message.getText());
 
-        System.out.println("Mensaje enviado al topic: " + message.getText());
         connection.close();
     }
 }

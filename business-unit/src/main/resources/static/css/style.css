@@ -1,0 +1,575 @@
+/* --- css/style.css --- */
+
+/* Variables CSS Globales */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --live-color: #dc3545;
+    --upcoming-color: #17a2b8;
+    --background-color: #f8f9fa;
+    --card-background-color: #ffffff;
+    --text-color: #343a40;
+    --border-color: #dee2e6;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --border-radius: 8px;
+    --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    --box-shadow-hover: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Reseteo básico y estilos generales del cuerpo */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    padding-top: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 0.75em;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+h1 {
+    font-size: 2.2em;
+    text-align: center;
+    margin-bottom: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+h2 {
+    font-size: 1.6em;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.3em;
+    margin-top: 1.5em;
+}
+
+h3 {
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 5px;
+}
+
+a {
+    text-decoration: none;
+    color: var(--primary-color);
+    transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+    color: #0056b3; /* Un azul un poco más oscuro al hacer hover */
+}
+
+/* --- Estilos para matches_overview.html --- */
+.match-list-container {
+    padding-bottom: 30px;
+}
+
+.matches-section h2 .live-indicator {
+    font-size: 0.7em;
+    color: var(--live-color);
+    font-weight: normal;
+}
+
+.match-list {
+    list-style: none;
+    padding: 0;
+}
+
+.match-card {
+    background-color: var(--card-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 15px;
+    padding: 15px 20px;
+    box-shadow: var(--box-shadow);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.match-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.match-card a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    color: var(--text-color);
+}
+
+.match-card .team-info-overview {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    gap: 8px; /* Espacio entre logo y nombre */
+}
+
+.match-card .team-logo-small {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+.match-card .team-name {
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.match-card .vs-separator {
+    margin: 0 10px;
+    font-size: 0.9em;
+    color: var(--secondary-color);
+}
+
+.match-card .match-time-overview {
+    font-size: 0.9em;
+    color: var(--secondary-color);
+    min-width: 100px; /* Ajustado para ser un poco más flexible */
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0; /* Para que no se encoja si los nombres de equipo son largos */
+}
+
+.live-match .match-time-overview {
+    color: var(--live-color);
+    font-weight: bold;
+}
+.live-match {
+    border-left: 5px solid var(--live-color);
+}
+
+.upcoming-match {
+    border-left: 5px solid var(--upcoming-color);
+}
+
+.no-matches-message {
+    background-color: var(--card-background-color);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    text-align: center;
+    color: var(--secondary-color);
+    margin-top: 15px;
+}
+
+.no-matches-message i {
+    font-size: 2em;
+    margin-bottom: 10px;
+    display: block;
+    color: var(--secondary-color);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.highlight-update {
+    animation: highlight 1s ease-out;
+}
+
+@keyframes highlight {
+    0% { background-color: #fff3cd; }
+    100% { background-color: var(--card-background-color); }
+}
+
+
+/* --- Estilos para match_details.html --- */
+.page-container {
+    display: flex;
+    gap: 20px;
+    max-width: 1100px;
+    margin: 20px auto; /* Añadido margen superior/inferior */
+    padding: 0 15px;
+}
+
+.sidebar {
+    flex: 0 0 280px; /* Un poco más ancho el sidebar */
+    background-color: var(--card-background-color);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    height: fit-content;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.sidebar ul li a {
+    display: flex; /* Para alinear icono y texto */
+    align-items: center;
+    gap: 8px; /* Espacio entre icono y texto */
+    padding: 10px 8px;
+    color: var(--text-color);
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, padding-left 0.2s ease, color 0.2s ease;
+    border-radius: 4px; /* Pequeño redondeo para los items */
+}
+.sidebar ul li a:hover {
+    color: var(--primary-color);
+    background-color: #e9ecef;
+    padding-left: 12px;
+}
+.sidebar ul li:last-child a {
+    border-bottom: none;
+}
+
+.sidebar .other-match-entry {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.4; /* Mejorar legibilidad */
+}
+
+.sidebar .other-match-teams {
+    font-weight: 600;
+    margin-bottom: 3px;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.sidebar .other-match-time {
+    font-size: 0.85em;
+    color: var(--secondary-color);
+}
+.sidebar li.live a .other-match-time { /* Estilo para tiempo de partidos en vivo en sidebar */
+    color: var(--live-color);
+    font-weight: bold;
+}
+
+
+.main-content {
+    flex-grow: 1;
+    background-color: var(--card-background-color);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.match-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-around; /* Distribuir más el espacio */
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 15px; /* Espacio entre elementos del header */
+}
+
+.team-info {
+    text-align: center;
+    flex: 1;
+    min-width: 120px; /* Para evitar que se encojan demasiado */
+}
+
+.team-logo {
+    width: 80px; /* Ajustado ligeramente */
+    height: 80px;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.team-info p {
+    font-size: 1.2em; /* Ajustado */
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.match-time-info {
+    text-align: center;
+    padding: 0 15px;
+    flex-shrink: 0; /* Evitar que se encoja */
+}
+
+.match-time-info .status-label {
+    font-size: 0.85em; /* Más pequeño */
+    color: var(--secondary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px; /* Pequeño espaciado */
+    margin-bottom: 5px;
+    display: block;
+}
+
+#detail-time {
+    font-size: 1.7em; /* Ajustado */
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.match-header.live #detail-time { /* Si el partido está en vivo */
+    color: var(--live-color);
+    animation: pulseLive 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseLive {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.odds-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: var(--border-radius);
+}
+
+.odd-box {
+    background-color: var(--card-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    text-align: center;
+    flex: 1 1 0;
+    min-width: 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.odd-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.07);
+}
+
+.odd-box .odd-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85em; /* Más pequeño */
+    color: var(--secondary-color);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    font-weight: 600;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.2;
+    min-height: 2.2em; /* Ajustado */
+    letter-spacing: 0.3px;
+}
+
+.odd-value {
+    font-size: 1.5em; /* Ajustado */
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+/* Estilos para Información Adicional del Partido */
+.additional-match-info-wrapper {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--card-background-color); /* Fondo igual que otros cards */
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.odds-source-info {
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Centra el contenido */
+    gap: 10px; /* Aumentado el gap */
+    margin-bottom: 20px;
+    color: var(--secondary-color);
+    font-size: 0.9em;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.odds-source-info span:first-of-type {
+    font-weight: 500;
+}
+
+.odds-source-info .odds-source-logo {
+    height: 18px;
+    width: auto;
+    vertical-align: middle;
+}
+
+.match-venue-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Asegurar que haya espacio */
+    gap: 15px;
+    align-items: start;
+}
+
+.venue-item {
+    display: flex;
+    align-items: flex-start; /* Alinear al inicio para labels multilínea */
+    gap: 12px;
+    padding: 12px 15px; /* Padding ajustado */
+    background-color: #f9f9f9; /* Fondo sutil para destacar */
+    border-radius: 6px;
+    /* border: 1px solid #eef0f2; */ /* Borde opcional */
+    transition: background-color 0.3s ease;
+}
+
+.venue-item i {
+    color: var(--primary-color);
+    font-size: 1.3em; /* Iconos consistentes */
+    width: 22px; /* Ancho para icono */
+    text-align: center;
+    margin-top: 3px; /* Pequeño ajuste para alinear con el texto */
+    flex-shrink: 0;
+}
+
+.venue-item .venue-text-content { /* Nuevo div para agrupar label y value */
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Para que ocupe el espacio restante */
+}
+
+.venue-label {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+
+.venue-value {
+    color: var(--secondary-color);
+    font-size: 0.95em; /* Tamaño ajustado */
+    line-height: 1.4;
+}
+
+/* Responsividad básica */
+@media (max-width: 768px) {
+    .container, .page-container {
+        padding: 0 10px;
+    }
+    .page-container {
+        flex-direction: column;
+    }
+    .sidebar {
+        flex: 0 0 auto;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    h1 { font-size: 1.8em; }
+    h2 { font-size: 1.4em; }
+    h3 { font-size: 1.1em; }
+
+    .match-card a {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .match-card .team-info-overview {
+        width:100%;
+    }
+    .match-card .match-time-overview {
+        text-align: left;
+        width:100%;
+    }
+
+    .match-header {
+        flex-direction: column;
+        gap: 20px; /* Aumentado el gap en móvil */
+    }
+    .team-logo {
+        width: 60px; /* Más pequeño en móvil */
+        height: 60px;
+    }
+    .team-info p { font-size: 1.1em; }
+    #detail-time { font-size: 1.5em; }
+
+    .odds-container {
+        flex-direction: column;
+    }
+    .odd-box .odd-label {
+        min-height: auto;
+    }
+    .odd-value { font-size: 1.4em; }
+
+    .additional-match-info-wrapper {
+        padding: 15px;
+    }
+    .odds-source-info {
+        font-size: 0.85em;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        justify-content: flex-start; /* Alinear a la izquierda en móvil si se envuelve */
+    }
+    .odds-source-info .odds-source-logo {
+        height: 16px;
+    }
+    .match-venue-details {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .venue-item i {
+        font-size: 1.2em;
+    }
+}
+
+@media (max-width: 480px) {
+    body { font-size: 14px; }
+    .team-info-overview {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .match-card .vs-separator {
+        display: none;
+    }
+    .match-card .team-name {
+        margin-bottom: 3px;
+    }
+}
+
+.card-style-section { /* Clase genérica para secciones con estilo de tarjeta */
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--card-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.odds-chart-container {
+    /* Ya usa card-style-section, se pueden añadir más estilos específicos si es necesario */
+    min-height: 300px; /* Altura mínima para el gráfico */
+    max-height: 450px; /* Altura máxima */
+    position: relative; /* Necesario para que Chart.js gestione el tamaño del canvas correctamente */
+}
+
+.odds-chart-container h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+    font-size: 1.2em;
+}
+
+.no-data-message { /* Para cuando no hay historial de cuotas */
+    text-align: center;
+    padding: 20px;
+    color: var(--secondary-color);
+    font-style: italic;
+}

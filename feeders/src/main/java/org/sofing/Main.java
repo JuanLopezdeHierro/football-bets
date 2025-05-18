@@ -2,17 +2,17 @@ package org.sofing;
 
 import org.sofing.control.Controller;
 
-import java.util.Scanner;
-
 public class Main {
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Por favor, introduce tu API key: ");
-        String apiKey = scanner.nextLine();
-
-        Controller controller = new Controller(apiKey);
+        Controller controller = new Controller();
         controller.start();
+        System.out.println("Feeder iniciado. Presiona Ctrl+C para detener.");
 
-        Runtime.getRuntime().addShutdownHook(new Thread(controller::stop));
+        Runtime.getRuntime()
+                .addShutdownHook(new Thread(() -> {
+                    System.out.println("Deteniendo el feeder...");
+                    controller.stop();
+                    System.out.println("Feeder detenido.");
+                }));
     }
 }

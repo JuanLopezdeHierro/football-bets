@@ -5,12 +5,14 @@ import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.sofing.model.Match;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class FootballWebScrapingImpl implements FootballWebScraping {
 
@@ -25,7 +27,7 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
 
         try {
             Document connection = Jsoup.connect(URL).get();
-            System.out.println("Conexión establecida");
+            System.out.println("ConexiÃ³n establecida");
 
             extractTeamsAndDateTimes(connection, teams, dateTimes);
             extractOdds(connection, odds);
@@ -33,7 +35,7 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return new Match(teams, dateTimes, new ArrayList<>(), "", "", odds);
+        return new Match(teams, dateTimes,odds, "LaLiga");
     }
 
     @Override
@@ -41,6 +43,7 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
         JSONArray jsonArray = new JSONArray();
         List<String> teams = match.getTeams();
         List<Double> odds = match.getOdds();
+        List<String> dateTimes = match.getDateTimes();
 
         for (int i = 0; i < teams.size(); i += 2) {
             JSONObject jsonObject = new JSONObject();
@@ -48,6 +51,7 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
             jsonObject.put("source", "Betfair");
             jsonObject.put("teamHome", teams.get(i));
             jsonObject.put("teamAway", teams.get(i + 1));
+            jsonObject.put("dateTime", dateTimes.get(i / 2));
 
             int oddsIndex = (i / 2) * 3;
             if (oddsIndex + 2 < odds.size()) {
@@ -61,24 +65,25 @@ public class FootballWebScrapingImpl implements FootballWebScraping {
     }
 
     private void extractTeamsAndDateTimes(Document connection, List<String> teams, List<String> dateTimes) {
-        List<Element> teamElements = connection.select("span.team-name");
-        List<Element> dateTimeElements = connection.select("span.date.ui-countdown");
-        List<Element> inPlayElements = connection.select("span.event-inplay-state.inplay.ui-time-stop-format");
+        Elements eventRows = connection.select("div.event-information, .event-row");
+        if (eventRows.isEmpty());
 
-        for (int i = 0; i < teamElements.size(); i += 2) {
-            teams.add(getTeamName(teamElements.get(i)));
-            teams.add(getTeamName(teamElements.get(i + 1)));
+        for (Element row : eventRows) {
+            Elements teamNameElements = row.select("span.team-name");
+            Element inPlayElement = row.selectFirst("span.event-inplay-state.inplay, span.gs-o-Timer");
+            Element dateTimeElement = row.selectFirst("span.date.ui-countdown, span.matches-time");
 
-            int matchIndex = i / 2;
+            if (teamNameElements.size() >= 2) {
+                teams.add(getTeamName(teamNameElements.get(0)));
+                teams.add(getTeamName(teamNameElements.get(1)));
 
-            if (matchIndex < inPlayElements.size()) {
-                dateTimes.add(getInPlayTime(inPlayElements.get(matchIndex)));
-            }
-            else if (matchIndex < dateTimeElements.size()) {
-                dateTimes.add(getDateTime(dateTimeElements.get(matchIndex)));
-            }
-            else {
-                dateTimes.add("N/A");
+                if (inPlayElement != null && !inPlayElement.text().trim().isEmpty()) {
+                    dateTimes.add(getInPlayTime(inPlayElement));
+                } else if (dateTimeElement != null && !dateTimeElement.text().trim().isEmpty()) {
+                    dateTimes.add(getDateTime(dateTimeElement));
+                } else {
+                    dateTimes.add("N/A");
+                }
             }
         }
     }

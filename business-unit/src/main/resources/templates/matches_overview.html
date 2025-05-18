@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enfrentamientos LaLiga</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<div class="container match-list-container">
+    <h1><i class="fas fa-futbol"></i> Partidos LaLiga</h1>
+
+    <div id="live-matches-section"
+         class="matches-section"
+         th:classappend="${#lists.isEmpty(liveMatches)} ? 'hidden' : ''">
+        <h2>EN DIRECTO <span class="live-indicator">(Actualizaciones en vivo)</span></h2>
+        <ul id="live-match-list" class="match-list">
+            <li th:each="match : ${liveMatches}"
+                th:id="'match-' + ${match.id}"
+                class="match-card live-match">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <div class="team-info-overview">
+                        <img th:if="${match.homeTeamLogoUrl != null}" th:src="@{${match.homeTeamLogoUrl}}" th:alt="${match.teamHome}" class="team-logo-small"/>
+                        <i th:unless="${match.homeTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
+                        <span class="team-name" th:text="${match.teamHome}"></span>
+                        <span class="vs-separator">VS</span>
+                        <img th:if="${match.awayTeamLogoUrl != null}" th:src="@{${match.awayTeamLogoUrl}}" th:alt="${match.teamAway}" class="team-logo-small"/>
+                        <i th:unless="${match.awayTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
+                        <span class="team-name" th:text="${match.teamAway}"></span>
+                    </div>
+                    <span class="match-time-overview"
+                          th:text="${match.liveTimeDisplay != null ? match.liveTimeDisplay : match.dateTimeString}">
+                    </span>
+                </a>
+            </li>
+        </ul>
+        <div id="no-live-matches-message" class="no-matches-message"
+             th:classappend="${not #lists.isEmpty(liveMatches)} ? 'hidden' : ''">
+            <i class="fas fa-broadcast-tower"></i>
+            <p>No hay partidos en directo en este momento.</p>
+        </div>
+    </div>
+
+    <div class="matches-section upcoming-section">
+        <h2>PRÓXIMOS PARTIDOS</h2>
+        <ul id="upcoming-match-list" class="match-list">
+            <li th:each="match : ${upcomingMatches}"
+                th:id="'match-' + ${match.id}"
+                class="match-card upcoming-match">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
+                    <div class="team-info-overview">
+                        <img th:if="${match.homeTeamLogoUrl != null}" th:src="@{${match.homeTeamLogoUrl}}" th:alt="${match.teamHome}" class="team-logo-small"/>
+                        <i th:unless="${match.homeTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
+                        <span class="team-name" th:text="${match.teamHome}"></span>
+                        <span class="vs-separator">VS</span>
+                        <img th:if="${match.awayTeamLogoUrl != null}" th:src="@{${match.awayTeamLogoUrl}}" th:alt="${match.teamAway}" class="team-logo-small"/>
+                        <i th:unless="${match.awayTeamLogoUrl != null}" class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>
+                        <span class="team-name" th:text="${match.teamAway}"></span>
+                    </div>
+                    <span class="match-time-overview"
+                          th:text="${match.dateTimeString != null ? match.dateTimeString : '--:--'}">
+                    </span>
+                </a>
+            </li>
+        </ul>
+        <div id="no-upcoming-matches-message" class="no-matches-message"
+             th:classappend="${not #lists.isEmpty(upcomingMatches)} ? 'hidden' : ''"
+             th:if="${#lists.isEmpty(upcomingMatches)}">
+            <i class="fas fa-calendar-alt"></i>
+            <p>No hay próximos partidos programados.</p>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const sseStreamUrlOverview = /*[[@{/matches/stream}]]*/ '/matches/stream';
+    const matchDetailBaseUrlOverview = /*[[@{/laliga/match/}]]*/ '/laliga/match/';
+    /*]]>*/
+
+    const evtSrcOverview = new EventSource(sseStreamUrlOverview);
+
+    evtSrcOverview.onmessage = function(event) {
+        const updatedMatches = JSON.parse(event.data);
+        let liveMatchesInDOMCount = 0;
+        let upcomingMatchesInDOMCount = 0;
+
+        // Primero, actualiza o crea elementos de partido
+        updatedMatches.forEach(match => {
+            let matchElement = document.getElementById('match-' + match.id);
+            const liveMatchList = document.getElementById('live-match-list');
+            const upcomingMatchList = document.getElementById('upcoming-match-list');
+
+            let timeText = '';
+            const matchStatusStr = match.matchStatus.name || match.matchStatus; // Para manejar Enum o String
+
+            if (matchStatusStr === 'LIVE') {
+                timeText = match.liveTimeDisplay || match.dateTimeString || 'En vivo';
+            } else {
+                timeText = match.dateTimeString || 'Próximamente';
+            }
+
+            if (!matchElement) {
+                matchElement = document.createElement('li');
+                matchElement.id = 'match-' + match.id;
+                matchElement.classList.add('match-card');
+
+                const link = document.createElement('a');
+                link.href = matchDetailBaseUrlOverview + match.id;
+
+                const teamInfoDiv = document.createElement('div');
+                teamInfoDiv.classList.add('team-info-overview');
+
+                const homeLogoHtml = match.homeTeamLogoUrl ? `<img src="${match.homeTeamLogoUrl}" alt="${match.teamHome || ''}" class="team-logo-small"/>` : '<i class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>';
+                const homeTeamHtml = `<span class="team-name">${match.teamHome || ''}</span>`;
+                const vsSeparatorHtml = '<span class="vs-separator">VS</span>';
+                const awayLogoHtml = match.awayTeamLogoUrl ? `<img src="${match.awayTeamLogoUrl}" alt="${match.teamAway || ''}" class="team-logo-small"/>` : '<i class="fas fa-shield-alt team-logo-small" style="opacity:0.5;"></i>';
+                const awayTeamHtml = `<span class="team-name">${match.teamAway || ''}</span>`;
+                teamInfoDiv.innerHTML = homeLogoHtml + homeTeamHtml + vsSeparatorHtml + awayLogoHtml + awayTeamHtml;
+
+                const timeSpan = document.createElement('span');
+                timeSpan.classList.add('match-time-overview');
+
+                link.appendChild(teamInfoDiv);
+                link.appendChild(timeSpan);
+                matchElement.appendChild(link);
+            }
+
+            const timeSpanInElement = matchElement.querySelector('.match-time-overview');
+            if (timeSpanInElement) timeSpanInElement.textContent = timeText;
+
+            const currentParentList = matchElement.parentElement;
+
+            if (matchStatusStr === 'LIVE') {
+                matchElement.classList.remove('upcoming-match');
+                matchElement.classList.add('live-match');
+                if (liveMatchList && currentParentList !== liveMatchList) liveMatchList.appendChild(matchElement);
+            } else if (matchStatusStr === 'UPCOMING' || matchStatusStr === 'SCHEDULED') {
+                matchElement.classList.remove('live-match');
+                matchElement.classList.add('upcoming-match');
+                if (upcomingMatchList && currentParentList !== upcomingMatchList) upcomingMatchList.appendChild(matchElement);
+            } else {
+                if (currentParentList) matchElement.remove();
+            }
+
+            if (document.body.contains(matchElement)) {
+                matchElement.classList.add('highlight-update');
+                setTimeout(() => { if (matchElement) matchElement.classList.remove('highlight-update'); }, 1000);
+            }
+        });
+
+        // Segundo, cuenta y actualiza la visibilidad de las secciones
+        const liveMatchListEl = document.getElementById('live-match-list');
+        const upcomingMatchListEl = document.getElementById('upcoming-match-list');
+        if (liveMatchListEl) liveMatchesInDOMCount = liveMatchListEl.getElementsByTagName('li').length;
+        if (upcomingMatchListEl) upcomingMatchesInDOMCount = upcomingMatchListEl.getElementsByTagName('li').length;
+
+        const liveSection = document.getElementById('live-matches-section');
+        const noLiveMessage = document.getElementById('no-live-matches-message');
+        if (liveSection && noLiveMessage) {
+            if (liveMatchesInDOMCount > 0) {
+                liveSection.classList.remove('hidden');
+                noLiveMessage.classList.add('hidden');
+            } else {
+                liveSection.classList.add('hidden');
+                noLiveMessage.classList.remove('hidden');
+            }
+        }
+
+        const noUpcomingMessage = document.getElementById('no-upcoming-matches-message');
+        if (noUpcomingMessage) {
+            if (upcomingMatchesInDOMCount > 0) {
+                noUpcomingMessage.classList.add('hidden');
+                if (upcomingMatchListEl) upcomingMatchListEl.classList.remove('hidden');
+            } else {
+                noUpcomingMessage.classList.remove('hidden');
+                if (upcomingMatchListEl) upcomingMatchListEl.classList.add('hidden');
+            }
+        }
+    };
+
+    evtSrcOverview.onerror = function(err) {
+        console.error("EventSource failed (overview):", err);
+    };
+</script>
+</body>
+</html>
