@@ -7,13 +7,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="business-unit (1)" />
         <module name="feeders" />
         <module name="event-store" />
+        <module name="business-unit (1)" />
+        <module name="business-unit" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="business-unit" target="17" />
       <module name="untitled" target="17" />
     </bytecodeTargetLevel>
   </component>

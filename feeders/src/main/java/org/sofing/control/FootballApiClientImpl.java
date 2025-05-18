@@ -2,106 +2,113 @@ package org.sofing.control;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.sofing.model.Match;
+import org.sofing.model.Fixtures;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-public class FootballApiClientImpl implements FootballApiClient {
-    private final String apiUrl = "https://v3.football.api-sports.io/teams?country=Spain";
+public class FootballApiClientImpl {
+    private static final String API_URL = "https://v3.football.api-sports.io/fixtures?date=";
     private final String apiKey;
-
-    private static final Map<String, String> TEAM_NAME_MAPPING = new HashMap<>() {{
-        put("FC Barcelona", "Barcelona");
-        put("Real Madrid", "Real Madrid");
-        put("Atlético de Madrid", "Atletico Madrid");
-        put("Athletic de Bilbao", "Athletic Club");
-        put("Real Sociedad", "Real Sociedad");
-        put("Betis", "Real Betis");
-        put("Villarreal", "Villarreal");
-        put("Las Palmas", "Las Palmas");
-        put("Valencia", "Valencia");
-        put("Rayo Vallecano", "Rayo Vallecano");
-        put("Osasuna", "Osasuna");
-        put("Getafe", "Getafe");
-        put("Alavés", "Alaves");
-        put("Sevilla", "Sevilla");
-        put("Celta de Vigo", "Celta Vigo");
-        put("Mallorca", "Mallorca");
-        put("Girona", "Girona");
-        put("Espanyol", "Espanyol");
-        put("Valladolid", "Valladolid");
-        put("Leganés", "Leganes");
-    }};
 
     public FootballApiClientImpl(String apiKey) {
         this.apiKey = apiKey;
     }
 
-    @Override
-    public void updateMatchFields(Match match) {
-        List<String> fields = new ArrayList<>();
+    /**
+     * Recupera los partidos de La Liga (id=140) de mañana y devuelve
+     * una lista de Fixtures con referee, stadium, homeTeam y round.
+     */
+    public List<Fixtures> fetchLaLigaFixtures() {
+        List<Fixtures> fixturesList = new ArrayList<>();
 
         try {
-            URL url = new URL(apiUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestProperty("x-rapidapi-host", "v3.football.api-sports.io");
-            connection.setRequestProperty("x-rapidapi-key", apiKey);
-            connection.setRequestMethod("GET");
-            connection.connect();
+            // Fecha de mañana
+            LocalDate tomorrow = LocalDate.now().plusDays(0);
+            String dateParam = tomorrow.format(DateTimeFormatter.ISO_LOCAL_DATE);
 
-            int responseCode = connection.getResponseCode();
-            if (responseCode == 200) {
-                JSONArray responseArray = getObjects(connection);
-                if (!responseArray.isEmpty()) {
-                    List<String> teams = match.getTeams();
-                    fields.addAll(fileSearcher(teams, responseArray));
-                    match.setFields(fields);
-                }
+            // Conexión
+            URL url = new URL(API_URL + dateParam);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("x-rapidapi-host", "v3.football.api-sports.io");
+            conn.setRequestProperty("x-rapidapi-key", apiKey);
+            conn.setRequestMethod("GET");
+            conn.connect();
+
+            if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                throw new IOException("API responded with code " + conn.getResponseCode());
+            }
+
+            // Parsear array "response"
+            JSONArray response = getResponseArray(conn);
+
+            // Filtrar y mapear a Fixtures
+            for (int i = 0; i < response.length(); i++) {
+                JSONObject item = response.getJSONObject(i);
+                JSONObject league = item.getJSONObject("league");
+                if (league.getInt("id") != 140) continue;
+
+                JSONObject fixture = item.getJSONObject("fixture");
+                String referee = fixture.isNull("referee")
+                        ? "N/A"
+                        : fixture.getString("referee");
+
+                JSONObject venue = fixture.getJSONObject("venue");
+                String stadium = venue.isNull("name")
+                        ? "N/A"
+                        : venue.getString("name");
+
+                JSONObject teams = item.getJSONObject("teams");
+                String homeTeam = teams.getJSONObject("home").getString("name");
+
+                String round = league.optString("round", "N/A");
+
+                fixturesList.add(new Fixtures(referee, stadium, homeTeam, round));
             }
 
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Error fetching La Liga fixtures", e);
         }
+
+        return fixturesList;
     }
 
-    private List<String> fileSearcher(List<String> teams, JSONArray responseArray) {
-        List<String> matchFields = new ArrayList<>();
-        for (int i = 0; i < teams.size(); i += 2) {
-            String teamName = teams.get(i);
-            String teamNameNormalized = TEAM_NAME_MAPPING.getOrDefault(teamName, teamName);
-
-            for (int j = 0; j < responseArray.length(); j++) {
-                JSONObject teamObj = responseArray.getJSONObject(j).getJSONObject("team");
-                String apiTeamName = teamObj.getString("name");
-
-                if (apiTeamName.equalsIgnoreCase(teamNameNormalized)) {
-                    JSONObject venue = responseArray.getJSONObject(j).getJSONObject("venue");
-                    matchFields.add(venue.getString("name"));
-                    break;
-                }
+    /**
+     * Convierte una lista de Fixtures a JSONArray, igual que matchDataToJson().
+     */
+    public JSONArray fixturesToJson(List<Fixtures> fixturesList, boolean includeMeta) {
+        JSONArray array = new JSONArray();
+        for (Fixtures f : fixturesList) {
+            JSONObject obj = new JSONObject();
+            obj.put("referee",  f.getReferee());
+            obj.put("stadium",  f.getStadium());
+            obj.put("homeTeam", f.getHomeTeam());
+            obj.put("round",    f.getRound());
+            if (includeMeta) {
+                obj.put("timeStamp", System.currentTimeMillis());
+                obj.put("source",    "APiSports");
             }
+            array.put(obj);
         }
-        return matchFields;
+        return array;
     }
 
-    private static JSONArray getObjects(HttpURLConnection connection) throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-        String inputLine;
-        StringBuilder content = new StringBuilder();
-        while ((inputLine = in.readLine()) != null) {
-            content.append(inputLine);
+    /** Lee todo el InputStream y devuelve el JSONArray "response". */
+    private static JSONArray getResponseArray(HttpURLConnection conn) throws IOException {
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(conn.getInputStream()))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = in.readLine()) != null) sb.append(line);
+            JSONObject root = new JSONObject(sb.toString());
+            return root.getJSONArray("response");
         }
-        in.close();
-
-        JSONObject jsonResponse = new JSONObject(content.toString());
-        return jsonResponse.getJSONArray("response");
     }
 }
