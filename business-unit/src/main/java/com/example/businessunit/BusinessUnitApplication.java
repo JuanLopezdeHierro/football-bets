@@ -1,13 +1,14 @@
-package com.example.businessunit; // Asegúrate que el paquete sea correcto
+package com.example.businessunit; // O tu paquete principal
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling; // Importar
 
 @SpringBootApplication
+@EnableScheduling // Habilitar tareas programadas
 public class BusinessUnitApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(BusinessUnitApplication.class, args);
-        System.out.println("✅ Business Unit iniciada en: http://localhost:8080/laliga/matches"); // Ruta actualizada
     }
 }

@@ -2,102 +2,160 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enfrentamientos LaLiga</title>
     <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
-    <style>
-        /* Estilos básicos para las secciones (puedes moverlos a style.css) */
-        .matches-section {
-            margin-bottom: 30px;
-            padding: 20px;
-            background-color: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .matches-section h2 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #dddddd;
-            color: #333;
-            font-size: 1.5em;
-        }
-        .matches-section h2 span {
-            font-size: 0.6em;
-            font-weight: normal;
-            margin-left: 10px;
-        }
-        .no-matches-message {
-            color: #6c757d;
-            font-style: italic;
-            padding: 10px 0;
-        }
-        .match-list li.live-match a {
-            color: #c82333;
-            font-weight: 600;
-        }
-        .match-list li.live-match .live-indicator {
-            display: inline-block;
-            background-color: #dc3545;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.75em;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-<div class="match-list-container">
-    <h1>Partidos LaLiga</h1>
+<div class="container match-list-container">
+    <h1><i class="fas fa-futbol"></i> Partidos LaLiga</h1>
 
-    <div class="matches-section live-section">
-        <h2>EN DIRECTO <span style="font-size: 0.7em; color: #dc3545;">(Actualizaciones desde ActiveMQ)</span></h2>
-        <ul class="match-list" th:if="${not #lists.isEmpty(liveMatches)}">
-            <li th:each="match : ${liveMatches}" class="live-match">
+    <div id="live-matches-section"
+         class="matches-section"
+         th:classappend="${#lists.isEmpty(liveMatches)} ? 'hidden' : ''">
+        <h2>EN DIRECTO <span class="live-indicator">(Actualizaciones en vivo)</span></h2>
+        <ul id="live-match-list" class="match-list">
+            <li th:each="match : ${liveMatches}"
+                th:id="'match-' + ${match.id}"
+                class="match-card live-match">
                 <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
-                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
-                    <span th:if="${match.liveTimeDisplay != null}" th:text="' - ' + ${match.liveTimeDisplay}" class="live-indicator"></span>
-                    <span th:if="${match.liveTimeDisplay == null && match.dateTimeString != null}" th:text="' - ' + ${match.dateTimeString}"></span>
+                    <div class="team-info-overview">
+                        <span class="team-name" th:text="${match.teamHome}"></span>
+                        <span class="vs-separator">VS</span>
+                        <span class="team-name" th:text="${match.teamAway}"></span>
+                    </div>
+                    <span class="match-time-overview"
+                          th:text="${match.liveTimeDisplay != null ? match.liveTimeDisplay : match.dateTimeString}">
+                    </span>
                 </a>
             </li>
         </ul>
-        <div th:if="${#lists.isEmpty(liveMatches)}" class="no-matches-message">
+        <div id="no-live-matches-message" class="no-matches-message"
+             th:classappend="${not #lists.isEmpty(liveMatches)} ? 'hidden' : ''">
+            <i class="fas fa-broadcast-tower"></i>
             <p>No hay partidos en directo en este momento.</p>
         </div>
     </div>
 
     <div class="matches-section upcoming-section">
-        <h2>PRÓXIMOS PARTIDOS <span style="font-size: 0.7em; color: #007bff;">(Desde Datalake/ActiveMQ)</span></h2>
-        <ul class="match-list" th:if="${not #lists.isEmpty(upcomingMatches)}">
-            <li th:each="match : ${upcomingMatches}">
+        <h2>PRÓXIMOS PARTIDOS</h2>
+        <ul id="upcoming-match-list" class="match-list" th:if="${not #lists.isEmpty(upcomingMatches)}">
+            <li th:each="match : ${upcomingMatches}"
+                th:id="'match-' + ${match.id}"
+                class="match-card upcoming-match">
                 <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
-                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
-                    <span th:if="${match.dateTimeString}" th:text="' - ' + ${match.dateTimeString}"></span>
+                    <div class="team-info-overview">
+                        <span class="team-name" th:text="${match.teamHome}"></span>
+                        <span class="vs-separator">VS</span>
+                        <span class="team-name" th:text="${match.teamAway}"></span>
+                    </div>
+                    <span class="match-time-overview"
+                          th:if="${match.dateTimeString}"
+                          th:text="${match.dateTimeString}">
+                    </span>
                 </a>
             </li>
         </ul>
         <div th:if="${#lists.isEmpty(upcomingMatches)}" class="no-matches-message">
+            <i class="fas fa-calendar-alt"></i>
             <p>No hay próximos partidos programados.</p>
         </div>
     </div>
-
-    <div class="matches-section historical-section">
-        <h2>HISTORIAL DE PARTIDOS <span style="font-size: 0.7em; color: #6c757d;">(Desde Datalake)</span></h2>
-        <ul class="match-list" th:if="${not #lists.isEmpty(historicalMatches)}">
-            <li th:each="match : ${historicalMatches}">
-                <a th:href="@{/laliga/match/{matchId}(matchId=${match.id})}">
-                    <span th:text="${match.teamHome}"></span> VS <span th:text="${match.teamAway}"></span>
-                    <span th:if="${match.dateTimeString}" th:text="' - ' + ${match.dateTimeString}"></span>
-                </a>
-            </li>
-        </ul>
-        <div th:if="${#lists.isEmpty(historicalMatches)}" class="no-matches-message">
-            <p>No hay historial de partidos disponible o no se han cargado.</p>
-        </div>
-    </div>
-
 </div>
+
+<script th:inline="javascript">
+    // Suscripción SSE: actualiza cada partido sin recarga
+    const evtSrc = new EventSource('/matches/stream');
+
+    evtSrc.onmessage = function(event) { // Puedes usar onmessage para capturar todos los eventos sin nombre específico
+        const updatedMatches = JSON.parse(event.data);
+        let hasLiveMatchesNow = false;
+
+        updatedMatches.forEach(match => {
+            if (match.matchStatus === 'LIVE') {
+                hasLiveMatchesNow = true;
+            }
+
+            let matchElement = document.getElementById('match-' + match.id);
+            const liveMatchList = document.getElementById('live-match-list');
+            const upcomingMatchList = document.getElementById('upcoming-match-list');
+
+            // Determinar el texto del tiempo/estado
+            let timeText = '';
+            if (match.matchStatus === 'LIVE') {
+                timeText = match.liveTimeDisplay || match.dateTimeString || 'En vivo';
+            } else { // UPCOMING or FINISHED (ajusta según tus estados)
+                timeText = match.dateTimeString || 'Próximamente';
+            }
+
+            // Si el elemento del partido existe, actualizarlo
+            if (matchElement) {
+                const timeSpan = matchElement.querySelector('.match-time-overview');
+                if (timeSpan) {
+                    timeSpan.textContent = timeText;
+                }
+                // Podrías querer mover el elemento entre listas si su estado cambia (ej. de upcoming a live)
+                // Esto es más complejo y requeriría quitar y añadir el elemento al DOM en la lista correcta.
+                // Por ahora, solo actualizamos el contenido y la clase.
+
+                // Asegurar que tenga la clase correcta (live-match o upcoming-match)
+                if (match.matchStatus === 'LIVE') {
+                    if (!matchElement.classList.contains('live-match')) {
+                        matchElement.classList.remove('upcoming-match'); // Si estaba en upcoming
+                        matchElement.classList.add('live-match');
+                        // Mover al DOM de la lista de live si es necesario
+                        if (liveMatchList && matchElement.parentElement !== liveMatchList) {
+                            liveMatchList.appendChild(matchElement);
+                        }
+                    }
+                } else { // Si no es LIVE (asumimos UPCOMING o similar para la lista de próximos)
+                    if (!matchElement.classList.contains('upcoming-match')) {
+                        matchElement.classList.remove('live-match');
+                        matchElement.classList.add('upcoming-match');
+                        // Mover al DOM de la lista de upcoming si es necesario
+                        if (upcomingMatchList && matchElement.parentElement !== upcomingMatchList) {
+                            upcomingMatchList.appendChild(matchElement);
+                        }
+                    }
+                }
+
+                // Aplicar animación de resaltado
+                matchElement.classList.add('highlight-update');
+                setTimeout(() => {
+                    if (matchElement) matchElement.classList.remove('highlight-update');
+                }, 1000);
+
+            } else {
+                // Si el elemento no existe, podría ser un nuevo partido. Habría que crearlo y añadirlo.
+                // Esta lógica puede ser compleja y depende de si esperas nuevos partidos vía SSE.
+                // console.log('Nuevo partido recibido, se necesita lógica para crearlo:', match);
+            }
+        });
+
+        // Gestionar visibilidad de la sección EN DIRECTO
+        const liveSection = document.getElementById('live-matches-section');
+        const noLiveMessage = document.getElementById('no-live-matches-message');
+        const liveList = document.getElementById('live-match-list');
+
+        // Verificar si hay elementos 'li' en la lista de partidos en vivo
+        const actualLiveMatchesInDOM = liveList ? liveList.getElementsByTagName('li').length > 0 : false;
+        // O usar hasLiveMatchesNow si confías en que el SSE te da el estado de todos los partidos relevantes
+
+        if (hasLiveMatchesNow || actualLiveMatchesInDOM) {
+            if (liveSection) liveSection.classList.remove('hidden');
+            if (noLiveMessage) noLiveMessage.classList.add('hidden');
+        } else {
+            if (liveSection) liveSection.classList.add('hidden');
+            if (noLiveMessage) noLiveMessage.classList.remove('hidden');
+        }
+    };
+
+    evtSrc.onerror = function(err) {
+        console.error("EventSource failed:", err);
+        // Podrías querer cerrar y reabrir la conexión o mostrar un mensaje al usuario
+    };
+
+</script>
 </body>
 </html>

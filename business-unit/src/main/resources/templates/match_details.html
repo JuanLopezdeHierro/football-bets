@@ -2,71 +2,225 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Detalle del Partido</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${selectedMatch != null ? selectedMatch.teamHome + ' vs ' + selectedMatch.teamAway : 'Detalle del Partido'}"></title>
     <link rel="stylesheet" type="text/css" th:href="@{/css/style.css}"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-<div class="page-container">
-    <div class="sidebar">
-        <div class="sidebar-title">GENERAL</div>
-        <ul class="match-list-sidebar" th:if="${not #lists.isEmpty(allMatches)}">
-            <li th:each="matchItem : ${allMatches}"
-                th:classappend="${selectedMatch != null and matchItem.id == selectedMatch.id} ? 'selected' : ''">
-                <a th:href="@{/laliga/match/{matchId}(matchId=${matchItem.id})}">
-                    <span th:text="${matchItem.teamHome}"></span> VS <span th:text="${matchItem.teamAway}"></span>
+<div class="page-container container">
+    <aside class="sidebar">
+        <h3>Otros Partidos</h3>
+        <ul id="other-matches-sidebar-list" th:if="${otherMatchesList != null and not #lists.isEmpty(otherMatchesList)}">
+            <li th:each="otherMatch : ${otherMatchesList}"
+                th:id="'other-match-' + ${otherMatch.id}"
+                th:classappend="${otherMatch.matchStatus != null and otherMatch.matchStatus.name() == 'LIVE'} ? 'live' : ''">
+                <a th:href="@{/laliga/match/{matchId}(matchId=${otherMatch.id})}" class="other-match-entry">
+                    <span class="other-match-teams" th:text="${otherMatch.teamHome + ' vs ' + otherMatch.teamAway}"></span>
+                    <span class="other-match-time"
+                          th:text="${(otherMatch.matchStatus != null and otherMatch.matchStatus.name() == 'LIVE') ?
+                                    (otherMatch.liveTimeDisplay != null ? otherMatch.liveTimeDisplay : otherMatch.dateTimeString) :
+                                    (otherMatch.dateTimeString != null ? otherMatch.dateTimeString : '--:--')}">
+                    </span>
                 </a>
             </li>
         </ul>
-        <div th:if="${#lists.isEmpty(allMatches)}">
-            <p>No hay partidos para mostrar.</p>
+        <div id="no-other-matches-sidebar-message" th:if="${otherMatchesList == null or #lists.isEmpty(otherMatchesList)}" style="padding: 5px 8px;">
+            <p style="font-size: 0.9em; color: var(--secondary-color);">No hay otros partidos disponibles.</p>
         </div>
-    </div>
 
-    <div class="main-content">
+        <h3 style="margin-top: 20px;">Navegación</h3>
+        <ul>
+            <li><a th:href="@{/laliga/matches}"><i class="fas fa-list-ul"></i> Volver a la lista</a></li>
+        </ul>
+    </aside>
+
+    <main class="main-content">
         <div th:if="${selectedMatch != null}">
-            <div class="match-header">
+            <div class="match-header" th:classappend="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE} ? 'live' : ''">
                 <div class="team-info">
-                    <img th:src="@{${homeLogo}}" th:alt="${selectedMatch.teamHome + ' Logo'}" class="team-logo"
-                         onerror="this.onerror=null; this.src='/images/logos/default.png';"/>
-                    <p th:text="${selectedMatch.teamHome}">Equipo Local</p>
+                    <img th:src="${homeLogo != null ? homeLogo : 'https://via.placeholder.com/100?text=L'}"
+                         th:alt="${selectedMatch.teamHome}" class="team-logo"/>
+                    <p th:text="${selectedMatch.teamHome}"></p>
                 </div>
                 <div class="match-time-info">
-                    <p th:if="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}">TIEMPO DE JUEGO</p>
-                    <p th:unless="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}">FECHA / HORA</p>
-
-                    <p th:if="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}"
-                       th:text="${selectedMatch.liveTimeDisplay != null ? selectedMatch.liveTimeDisplay : selectedMatch.dateTimeString}"></p>
-                    <p th:unless="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}"
-                       th:text="${selectedMatch.dateTimeString != null ? selectedMatch.dateTimeString : '--:--'}"></p>
+                    <span class="status-label"
+                          th:text="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE ? 'TIEMPO DE JUEGO' : 'FECHA / HORA'}">
+                    </span>
+                    <p id="detail-time">
+                        <span th:if="${selectedMatch.matchStatus == T(com.example.businessunit.model.MatchStatus).LIVE}"
+                              th:text="${selectedMatch.liveTimeDisplay != null ? selectedMatch.liveTimeDisplay : (selectedMatch.dateTimeString != null ? selectedMatch.dateTimeString : 'En Vivo')}">
+                        </span>
+                        <span th:if="${selectedMatch.matchStatus != T(com.example.businessunit.model.MatchStatus).LIVE}"
+                              th:text="${selectedMatch.dateTimeString != null ? selectedMatch.dateTimeString : '--:--'}">
+                        </span>
+                    </p>
                 </div>
+
                 <div class="team-info">
-                    <img th:src="@{${awayLogo}}" th:alt="${selectedMatch.teamAway + ' Logo'}" class="team-logo"
-                         onerror="this.onerror=null; this.src='/images/logos/default.png';"/>
-                    <p th:text="${selectedMatch.teamAway}">Equipo Visitante</p>
+                    <img th:src="${awayLogo != null ? awayLogo : 'https://via.placeholder.com/100?text=V'}"
+                         th:alt="${selectedMatch.teamAway}" class="team-logo"/>
+                    <p th:text="${selectedMatch.teamAway}"></p>
                 </div>
             </div>
 
             <div class="odds-container">
                 <div class="odd-box">
-                    <span>LOCAL</span>
-                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsHome, 1, 2)}">1.00</span>
+                    <span class="odd-label" th:text="${selectedMatch.teamHome}">LOCAL</span>
+                    <span id="oddsHome" class="odd-value"
+                          th:text="${selectedMatch.oddsHome != null ? #numbers.formatDecimal(selectedMatch.oddsHome,1,2) : 'N/A'}">1.00</span>
                 </div>
                 <div class="odd-box">
-                    <span>EMPATE</span>
-                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsDraw, 1, 2)}">1.00</span>
+                    <span class="odd-label">EMPATE</span>
+                    <span id="oddsDraw" class="odd-value"
+                          th:text="${selectedMatch.oddsDraw != null ? #numbers.formatDecimal(selectedMatch.oddsDraw,1,2) : 'N/A'}">1.00</span>
                 </div>
                 <div class="odd-box">
-                    <span>VISITANTE</span>
-                    <span class="odd-value" th:text="${#numbers.formatDecimal(selectedMatch.oddsAway, 1, 2)}">1.00</span>
+                    <span class="odd-label" th:text="${selectedMatch.teamAway}">VISITANTE</span>
+                    <span id="oddsAway" class="odd-value"
+                          th:text="${selectedMatch.oddsAway != null ? #numbers.formatDecimal(selectedMatch.oddsAway,1,2) : 'N/A'}">1.00</span>
                 </div>
             </div>
-            <p class="source-info">Fuente de las cuotas: <span th:text="${selectedMatch.source}">Betfair</span></p>
+
         </div>
-        <div th:if="${selectedMatch == null}">
-            <p th:if="${errorMessage}" th:text="${errorMessage}" class="error-message">Error al cargar el partido.</p>
-            <p th:unless="${errorMessage}">Selecciona un partido de la lista para ver los detalles.</p>
+        <div th:if="${selectedMatch == null}" class="no-matches-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>No se ha podido cargar la información del partido. Por favor, <a th:href="@{/laliga/matches}">vuelve a la lista de partidos</a>.</p>
         </div>
-    </div>
+    </main>
 </div>
+
+<script th:if="${selectedMatch != null}" th:inline="javascript">
+    /*<![CDATA[*/
+    const selectedMatchId = /*[[${selectedMatch.id}]]*/ 'NONE';
+    const matchDetailBaseUrlJs = /*[[@{/laliga/match/}]]*/ '/laliga/match/';
+    const sseStreamUrlDetails = /*[[@{/matches/stream}]]*/ '/matches/stream';
+    /*]]>*/
+
+    if (selectedMatchId !== 'NONE') {
+        // Seleccionar los spans dentro de p#detail-time
+        const detailTimeLiveSpan = document.querySelector('#detail-time span:first-of-type'); // Asumiendo que el span para LIVE es el primero
+        const detailTimeScheduledSpan = document.querySelector('#detail-time span:last-of-type'); // Asumiendo que el span para SCHEDULED es el segundo
+
+        const statusLabelElement = document.querySelector('.match-time-info .status-label');
+        const matchHeaderElement = document.querySelector('.match-header');
+
+        const oddsHomeElement = document.getElementById('oddsHome');
+        const oddsDrawElement = document.getElementById('oddsDraw');
+        const oddsAwayElement = document.getElementById('oddsAway');
+
+        const src = new EventSource(sseStreamUrlDetails);
+
+        src.onmessage = function(event) {
+            const updatedMatchesAll = JSON.parse(event.data);
+
+            const currentMatchData = updatedMatchesAll.find(m => m.id == selectedMatchId);
+            if (currentMatchData) {
+                // Actualizar Tiempo/Estado del partido principal
+                if (statusLabelElement && detailTimeLiveSpan && detailTimeScheduledSpan) {
+                    let isLive = currentMatchData.matchStatus === 'LIVE' || (currentMatchData.matchStatus && currentMatchData.matchStatus.name === 'LIVE');
+
+                    statusLabelElement.textContent = isLive ? 'TIEMPO DE JUEGO' : 'FECHA / HORA';
+
+                    if (isLive) {
+                        const liveText = currentMatchData.liveTimeDisplay || currentMatchData.dateTimeString || 'En Vivo';
+                        if (detailTimeLiveSpan.textContent !== liveText) {
+                            detailTimeLiveSpan.textContent = liveText;
+                            applyHighlight(detailTimeLiveSpan);
+                        }
+                        detailTimeLiveSpan.style.display = '';
+                        detailTimeScheduledSpan.style.display = 'none';
+                    } else {
+                        const scheduledText = currentMatchData.dateTimeString || '--:--';
+                        if (detailTimeScheduledSpan.textContent !== scheduledText) {
+                            detailTimeScheduledSpan.textContent = scheduledText;
+                            applyHighlight(detailTimeScheduledSpan);
+                        }
+                        detailTimeLiveSpan.style.display = 'none';
+                        detailTimeScheduledSpan.style.display = '';
+                    }
+
+                    if (matchHeaderElement) {
+                        if (isLive) matchHeaderElement.classList.add('live');
+                        else matchHeaderElement.classList.remove('live');
+                    }
+                }
+
+                // Actualizar Cuotas
+                updateOddValue(oddsHomeElement, currentMatchData.oddsHome);
+                updateOddValue(oddsDrawElement, currentMatchData.oddsDraw);
+                updateOddValue(oddsAwayElement, currentMatchData.oddsAway);
+            }
+
+            // Actualizar dinámicamente la lista "Otros Partidos"
+            const otherMatchesListContainer = document.getElementById('other-matches-sidebar-list');
+            const noOtherMatchesMessageDiv = document.getElementById('no-other-matches-sidebar-message');
+
+            if (otherMatchesListContainer) {
+                const relevantSidebarMatches = updatedMatchesAll.filter(m => {
+                    const status = m.matchStatus.name || m.matchStatus;
+                    return m.id != selectedMatchId && (status === 'LIVE' || status === 'UPCOMING' || status === 'SCHEDULED');
+                });
+
+                otherMatchesListContainer.innerHTML = '';
+
+                if (relevantSidebarMatches.length === 0) {
+                    if (noOtherMatchesMessageDiv) noOtherMatchesMessageDiv.style.display = 'block';
+                } else {
+                    if (noOtherMatchesMessageDiv) noOtherMatchesMessageDiv.style.display = 'none';
+
+                    relevantSidebarMatches.forEach(om => {
+                        const li = document.createElement('li');
+                        li.id = `other-match-${om.id}`;
+                        const status = om.matchStatus.name || om.matchStatus;
+                        if (status === 'LIVE') li.classList.add('live');
+
+                        const a = document.createElement('a');
+                        a.href = matchDetailBaseUrlJs + om.id;
+                        a.classList.add('other-match-entry');
+
+                        const teamsSpan = document.createElement('span');
+                        teamsSpan.classList.add('other-match-teams');
+                        teamsSpan.textContent = `${om.teamHome || ''} vs ${om.teamAway || ''}`;
+
+                        const timeSpan = document.createElement('span');
+                        timeSpan.classList.add('other-match-time');
+                        timeSpan.textContent = (status === 'LIVE') ?
+                            (om.liveTimeDisplay || om.dateTimeString || 'En vivo') :
+                            (om.dateTimeString || '--:--');
+
+                        a.appendChild(teamsSpan);
+                        a.appendChild(timeSpan);
+                        li.appendChild(a);
+                        otherMatchesListContainer.appendChild(li);
+                    });
+                }
+            }
+        };
+
+        src.onerror = function(err) {
+            console.error("EventSource failed for match details:", err);
+        };
+
+        function updateOddValue(element, newValue) {
+            if (element) {
+                const formattedValue = newValue != null ? parseFloat(newValue).toFixed(2) : 'N/A';
+                if (element.textContent !== formattedValue) {
+                    element.textContent = formattedValue;
+                    applyHighlight(element);
+                }
+            }
+        }
+
+        function applyHighlight(element) {
+            if (element) {
+                element.classList.add('highlight-update');
+                setTimeout(() => {
+                    element.classList.remove('highlight-update');
+                }, 1000);
+            }
+        }
+    }
+</script>
 </body>
 </html>

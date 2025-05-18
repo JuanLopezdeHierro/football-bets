@@ -18,57 +18,87 @@ import java.util.regex.Pattern;
 public class DateTimeUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(DateTimeUtil.class);
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DAY_MONTH_TIME_FORMATTER_ES = DateTimeFormatter.ofPattern("d MMM HH:mm", new Locale("es", "ES"));
-    private static final Pattern DAY_MONTH_PATTERN = Pattern.compile("(\\d{1,2})\\s+([a-zA-Z]+)");
+    private static final DateTimeFormatter TIME_ONLY_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    // Considera hacer este formatter más robusto o añadir más patrones si los formatos varían mucho.
+    // Por ejemplo, para "d MMM HH:mm", el mes debe estar en el locale correcto.
+    // private static final DateTimeFormatter DAY_MONTH_TIME_FORMATTER_ES = DateTimeFormatter.ofPattern("d MMM HH:mm", new Locale("es", "ES"));
+    private static final Pattern DAY_MONTH_TIME_PATTERN = Pattern.compile("(\\d{1,2})\\s+([a-zA-Z]+)\\s+(\\d{2}:\\d{2})"); // ej. "15 may 19:00"
+    private static final Pattern TOMORROW_TIME_PATTERN = Pattern.compile("Mañana\\s+(\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
+
 
     public static ZonedDateTime parseCustomDateTime(String dateTimeString) {
         if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
+            logger.debug("Input dateTimeString is null or empty.");
             return null;
         }
-        LocalDate today = LocalDate.now(ZoneId.systemDefault());
-        LocalDate datePart = today;
+
+        ZoneId systemZone = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(systemZone);
+        LocalDate datePart = today; // Por defecto, asumimos hoy si no se especifica otra fecha.
         LocalTime timePart;
 
         try {
-            if (dateTimeString.matches("\\d{2}:\\d{2}")) { // Formato "19:00"
-                timePart = LocalTime.parse(dateTimeString, TIME_FORMATTER);
-            } else if (dateTimeString.toLowerCase().startsWith("mañana")) { // Formato "Mañana 19:00"
+            // 1. Intenta formato "HH:mm" (asume hoy)
+            if (dateTimeString.matches("\\d{2}:\\d{2}")) {
+                timePart = LocalTime.parse(dateTimeString, TIME_ONLY_FORMATTER);
+                return LocalDateTime.of(datePart, timePart).atZone(systemZone);
+            }
+
+            // 2. Intenta formato "Mañana HH:mm"
+            Matcher tomorrowMatcher = TOMORROW_TIME_PATTERN.matcher(dateTimeString);
+            if (tomorrowMatcher.matches()) {
                 datePart = today.plusDays(1);
-                String timeStr = dateTimeString.substring(dateTimeString.indexOf(" ") + 1);
-                timePart = LocalTime.parse(timeStr, TIME_FORMATTER);
-            } else if (dateTimeString.matches("\\d{1,2}\\s+[a-zA-Z]+\\s+\\d{2}:\\d{2}")) { // Formato "15 may 19:00"
-                // Necesitamos parsear el mes en español
-                Matcher matcher = DAY_MONTH_PATTERN.matcher(dateTimeString);
-                if (matcher.find()) {
-                    int day = Integer.parseInt(matcher.group(1));
-                    String monthStrEs = matcher.group(2).toLowerCase();
-                    Month month = mapSpanishMonth(monthStrEs);
-                    if (month == null) {
-                        logger.warn("Mes no reconocido en español: {}", monthStrEs);
-                        return null;
-                    }
-                    // Asumimos el año actual. Esto podría necesitar ajuste si los eventos cruzan años.
-                    datePart = LocalDate.of(today.getYear(), month, day);
-                    String timeStr = dateTimeString.substring(dateTimeString.lastIndexOf(" ") + 1);
-                    timePart = LocalTime.parse(timeStr, TIME_FORMATTER);
-                } else {
-                    logger.warn("No se pudo parsear la fecha con formato 'dd MMM HH:mm': {}", dateTimeString);
+                timePart = LocalTime.parse(tomorrowMatcher.group(1), TIME_ONLY_FORMATTER);
+                return LocalDateTime.of(datePart, timePart).atZone(systemZone);
+            }
+
+            // 3. Intenta formato "d MMM HH:mm" (ej. "15 may 19:00")
+            Matcher dayMonthTimeMatcher = DAY_MONTH_TIME_PATTERN.matcher(dateTimeString);
+            if (dayMonthTimeMatcher.matches()) {
+                int day = Integer.parseInt(dayMonthTimeMatcher.group(1));
+                String monthStrEs = dayMonthTimeMatcher.group(2).toLowerCase();
+                Month month = mapSpanishMonth(monthStrEs);
+                timePart = LocalTime.parse(dayMonthTimeMatcher.group(3), TIME_ONLY_FORMATTER);
+
+                if (month == null) {
+                    logger.warn("Spanish month not recognized: '{}' in string '{}'", monthStrEs, dateTimeString);
                     return null;
                 }
-            } else {
-                logger.warn("Formato de dateTimeString no reconocido: {}", dateTimeString);
-                return null; // Formato no reconocido
+                // Asume el año actual. Si el mes del evento ya pasó este año, asume el siguiente año.
+                int year = today.getYear();
+                if (month.getValue() < today.getMonthValue() || (month.getValue() == today.getMonthValue() && day < today.getDayOfMonth())) {
+                    // Si la fecha "d MMM" es anterior a hoy en el año actual, asumimos que es del próximo año.
+                    // Esto podría no ser siempre correcto si se manejan fechas históricas que también usan "d MMM".
+                    // logger.trace("Date {} {} seems to be in the past for current year {}, assuming next year.", day, monthStrEs, year);
+                    // year++; // Descomentar si esta es la lógica deseada. Para la mayoría de "próximos partidos", el año actual está bien.
+                }
+                datePart = LocalDate.of(year, month, day);
+                return LocalDateTime.of(datePart, timePart).atZone(systemZone);
             }
-            return LocalDateTime.of(datePart, timePart).atZone(ZoneId.systemDefault());
+
+            // 4. Si no coincide con formatos comunes, intenta parsear directamente con DateTimeFormatter (si tuvieras formatos más estándar)
+            // Por ejemplo, si esperaras "yyyy-MM-dd HH:mm"
+            // try {
+            //     LocalDateTime ldt = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            //     return ldt.atZone(systemZone);
+            // } catch (DateTimeParseException ignored) {}
+
+
+            logger.warn("Unrecognized dateTimeString format: {}", dateTimeString);
+            return null;
         } catch (DateTimeParseException e) {
-            logger.error("Error parseando dateTimeString: '{}'. Error: {}", dateTimeString, e.getMessage());
+            logger.error("Error parsing dateTimeString: '{}'. Error: {}", dateTimeString, e.getMessage());
+            return null;
+        } catch (Exception e) { // Captura general por si algo más falla (ej. NumberFormatException)
+            logger.error("Unexpected error parsing dateTimeString: '{}'. Error: {}", dateTimeString, e.getMessage(), e);
             return null;
         }
     }
 
     private static Month mapSpanishMonth(String monthStrEs) {
-        return switch (monthStrEs) {
+        // Asegurar que solo se usen las primeras 3 letras y en minúscula para la comparación
+        String normalizedMonth = monthStrEs.length() > 3 ? monthStrEs.substring(0, 3).toLowerCase() : monthStrEs.toLowerCase();
+        return switch (normalizedMonth) {
             case "ene" -> Month.JANUARY;
             case "feb" -> Month.FEBRUARY;
             case "mar" -> Month.MARCH;
@@ -77,7 +107,7 @@ public class DateTimeUtil {
             case "jun" -> Month.JUNE;
             case "jul" -> Month.JULY;
             case "ago" -> Month.AUGUST;
-            case "sep", "set" -> Month.SEPTEMBER; // "set" es común también
+            case "sep", "set" -> Month.SEPTEMBER;
             case "oct" -> Month.OCTOBER;
             case "nov" -> Month.NOVEMBER;
             case "dic" -> Month.DECEMBER;

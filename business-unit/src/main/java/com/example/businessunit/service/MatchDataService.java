@@ -10,6 +10,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -17,14 +18,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+// import java.util.Collections; // No se usa directamente, se puede quitar si no es necesario en otro lado
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects; // Importar para Objects.equals
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,79 +40,174 @@ public class MatchDataService {
     private static final Logger logger = LoggerFactory.getLogger(MatchDataService.class);
     private final ObjectMapper objectMapper;
     private final List<MatchEvent> matchEventsCache = new ArrayList<>();
-
     private final Path EVENTS_DIRECTORY_PATH = Paths.get("datalake/eventstore/Match_Topic/default");
-    // Patrón para identificar formatos como "34'", "HT", "90+2'", "Descanso"
     private static final Pattern LIVE_TIME_PATTERN = Pattern.compile("^(\\d{1,3}['+]?\\d*|HT|FT|Descanso)$", Pattern.CASE_INSENSITIVE);
+    private final DateTimeFormatter DAILY_FILE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    private FileTime lastDatalakeFileReadTimestamp = null;
+    private Path currentDailyEventFilePath = null;
+
+    private final MatchSseService sseService;
 
     @Autowired
-    public MatchDataService(ObjectMapper objectMapper) {
+    public MatchDataService(ObjectMapper objectMapper, MatchSseService sseService) {
         this.objectMapper = objectMapper;
+        this.sseService = sseService;
     }
 
     @PostConstruct
     public void initializeMatchEvents() {
-        logger.info("Inicializando carga de eventos de partidos desde datalake...");
+        logger.info("Initializing historic match event load from datalake...");
+        loadAllHistoricalEventsFromDatalake();
+        updateCurrentDailyEventFilePath();
+    }
+
+    private void loadAllHistoricalEventsFromDatalake() {
         Map<String, MatchEvent> uniqueMatchesMap = new HashMap<>();
-        List<Path> eventFiles = new ArrayList<>();
+        List<Path> eventFiles = List.of();
 
         if (!Files.isDirectory(EVENTS_DIRECTORY_PATH)) {
-            logger.warn("El directorio de eventos del datalake no existe: {}", EVENTS_DIRECTORY_PATH.toAbsolutePath());
-        } else {
-            try (Stream<Path> paths = Files.walk(EVENTS_DIRECTORY_PATH)) {
-                eventFiles = paths
-                        .filter(Files::isRegularFile)
-                        .filter(path -> path.toString().endsWith(".events"))
-                        .collect(Collectors.toList());
-
-                for (Path filePath : eventFiles) {
-                    logger.debug("Procesando archivo histórico/datalake: {}", filePath);
-                    try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            if (line.trim().isEmpty()) continue;
-                            try {
-                                List<MatchEventDTO> dtos = objectMapper.readValue(line, new TypeReference<List<MatchEventDTO>>() {});
-                                for (MatchEventDTO dto : dtos) {
-                                    ZonedDateTime parsedEventTimestamp = dto.timeStamp;
-                                    String matchKey = generateMatchKey(dto.teamHome, dto.teamAway, dto.dateTime, parsedEventTimestamp);
-
-                                    MatchEvent currentEventInMap = uniqueMatchesMap.get(matchKey);
-                                    if (currentEventInMap == null || (parsedEventTimestamp != null && parsedEventTimestamp.isAfter(currentEventInMap.getTimeStamp()))) {
-                                        MatchStatus status = determineStatusFromDateTimeString(dto.dateTime, parsedEventTimestamp);
-                                        MatchEvent event = new MatchEvent(
-                                                parsedEventTimestamp, dto.dateTime, dto.oddsDraw, dto.teamAway,
-                                                dto.oddsAway, dto.teamHome, dto.source, dto.oddsHome, status
-                                        );
-                                        if (status == MatchStatus.LIVE) {
-                                            event.setLiveTimeDisplay(dto.dateTime);
-                                        }
-                                        uniqueMatchesMap.put(matchKey, event);
-                                    }
-                                }
-                            } catch (Exception e) {
-                                logger.error("Error parseando línea JSON del archivo {}: '{}'. Error: {}", filePath, line, e.getMessage());
-                            }
-                        }
-                    } catch (IOException e) {
-                        logger.error("Error leyendo el archivo de eventos: " + filePath, e);
-                    }
-                }
-            } catch (IOException e) {
-                logger.error("Error al acceder al directorio de eventos: " + EVENTS_DIRECTORY_PATH, e);
-            }
+            logger.warn("Datalake event directory does not exist: {}", EVENTS_DIRECTORY_PATH.toAbsolutePath());
+            return;
         }
+        try (Stream<Path> paths = Files.walk(EVENTS_DIRECTORY_PATH)) {
+            eventFiles = paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".events"))
+                    .collect(Collectors.toList());
+
+            for (Path filePath : eventFiles) {
+                processDatalakeFile(filePath, uniqueMatchesMap);
+            }
+        } catch (IOException e) {
+            logger.error("Error accessing event directory: " + EVENTS_DIRECTORY_PATH, e);
+        }
+
         synchronized (this.matchEventsCache) {
             this.matchEventsCache.clear();
             this.matchEventsCache.addAll(uniqueMatchesMap.values());
-            logger.info("✅ {} eventos únicos cargados inicialmente desde {} archivos del datalake. Tamaño total de caché: {}", uniqueMatchesMap.size(), eventFiles.size(), this.matchEventsCache.size());
+            logger.info("✅ {} unique events loaded initially from {} datalake files. Total cache size: {}", uniqueMatchesMap.size(), eventFiles.size(), this.matchEventsCache.size());
         }
+    }
+
+    private void updateCurrentDailyEventFilePath() {
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        String dailyFileName = today.format(DAILY_FILE_FORMATTER) + ".events";
+        this.currentDailyEventFilePath = EVENTS_DIRECTORY_PATH.resolve(dailyFileName);
+        logger.info("Monitoring daily event file: {}", this.currentDailyEventFilePath);
+    }
+
+    @Scheduled(fixedDelayString = "PT10S")
+    public void pollDailyDatalakeFile() {
+        if (this.currentDailyEventFilePath == null || !Files.exists(this.currentDailyEventFilePath)) {
+            updateCurrentDailyEventFilePath();
+            if (this.currentDailyEventFilePath == null || !Files.exists(this.currentDailyEventFilePath)) {
+                logger.trace("Daily event file not found or not yet created: {}", this.currentDailyEventFilePath);
+                return;
+            }
+        }
+
+        try {
+            FileTime currentFileTimestamp = Files.getLastModifiedTime(this.currentDailyEventFilePath);
+            // CORRECCIÓN 1: Comparación de FileTime
+            if (lastDatalakeFileReadTimestamp != null && currentFileTimestamp.compareTo(lastDatalakeFileReadTimestamp) <= 0) {
+                logger.trace("No changes in daily event file {} since last read.", this.currentDailyEventFilePath.getFileName());
+                return;
+            }
+
+            logger.info("Detected change in daily event file: {}. Processing...", this.currentDailyEventFilePath.getFileName());
+
+            Map<String, MatchEvent> dailyFileMatchesMap = new HashMap<>();
+            processDatalakeFile(this.currentDailyEventFilePath, dailyFileMatchesMap);
+
+            if (!dailyFileMatchesMap.isEmpty()) {
+                boolean cacheUpdated = false;
+                synchronized (this.matchEventsCache) {
+                    for (MatchEvent eventFromFile : dailyFileMatchesMap.values()) {
+                        cacheUpdated |= updateOrAddEventInCache(eventFromFile);
+                    }
+                }
+                if (cacheUpdated) {
+                    logger.info("Cache updated from daily datalake file. Sending SSE update.");
+                    sseService.sendUpdate(getAllMatchEvents());
+                }
+            }
+            lastDatalakeFileReadTimestamp = currentFileTimestamp;
+
+        } catch (IOException e) {
+            logger.error("Error polling daily datalake file: {}", this.currentDailyEventFilePath, e);
+        }
+    }
+
+    private void processDatalakeFile(Path filePath, Map<String, MatchEvent> matchesMapToUpdate) {
+        logger.debug("Processing datalake file: {}", filePath);
+        try {
+            List<String> lines = Files.readAllLines(filePath);
+            if (!lines.isEmpty()) {
+                String lastLineWithData = null;
+                for (int i = lines.size() - 1; i >= 0; i--) {
+                    if (!lines.get(i).trim().isEmpty()) {
+                        lastLineWithData = lines.get(i);
+                        break;
+                    }
+                }
+                if (lastLineWithData != null) {
+                    logger.debug("Processing last JSON array from file {}: '{}'", filePath, lastLineWithData);
+                    processJsonLine(lastLineWithData, filePath, matchesMapToUpdate);
+                } else {
+                    logger.debug("File {} is empty or contains only empty lines.", filePath);
+                }
+            }
+        } catch (IOException e) {
+            logger.error("Error reading event file: " + filePath, e);
+        }
+    }
+
+    private void processJsonLine(String jsonLine, Path sourceFilePath, Map<String, MatchEvent> matchesMapToUpdate) {
+        try {
+            List<MatchEventDTO> dtos = objectMapper.readValue(jsonLine, new TypeReference<List<MatchEventDTO>>() {});
+            for (MatchEventDTO dto : dtos) {
+                ZonedDateTime parsedEventTimestamp = dto.getTimeStamp();
+                String matchKey = generateMatchKey(dto.getTeamHome(), dto.getTeamAway(), dto.getDateTime(), parsedEventTimestamp);
+
+                MatchStatus status = determineStatusFromDateTimeString(dto.getDateTime(), parsedEventTimestamp);
+                String homeLogoUrl = generateLogoUrlFromName(dto.getTeamHome()); // Asegúrate que este método exista en la clase
+                String awayLogoUrl = generateLogoUrlFromName(dto.getTeamAway()); // Asegúrate que este método exista en la clase
+
+                MatchEvent event = new MatchEvent(
+                        parsedEventTimestamp, dto.getDateTime(),
+                        dto.getOddsDraw() != null ? dto.getOddsDraw() : 0.0,
+                        dto.getTeamAway(),
+                        dto.getOddsAway() != null ? dto.getOddsAway() : 0.0,
+                        dto.getTeamHome(),
+                        "datalake_file:" + sourceFilePath.getFileName().toString(),
+                        dto.getOddsHome() != null ? dto.getOddsHome() : 0.0,
+                        status,
+                        homeLogoUrl, awayLogoUrl
+                );
+                if (status == MatchStatus.LIVE) {
+                    event.setLiveTimeDisplay(dto.getDateTime());
+                }
+                matchesMapToUpdate.put(matchKey, event);
+            }
+        } catch (Exception e) {
+            logger.error("Error parsing JSON line from file {}: '{}'. Error: {}", sourceFilePath, jsonLine, e.getMessage(), e);
+        }
+    }
+
+    // Asegúrate de que estos métodos privados estén definidos DENTRO de la clase MatchDataService
+    private String generateLogoUrlFromName(String teamName) {
+        if (teamName == null || teamName.trim().isEmpty()) {
+            return "/images/logos/default_logo.png"; // O null, o un logo por defecto real
+        }
+        return "/images/logos/" + teamName.replace(" ", "_") + ".png";
     }
 
     private String generateMatchKey(String teamHome, String teamAway, String dateTimeString, ZonedDateTime eventTimestamp) {
         String dateComponent;
+        if (teamHome == null || teamAway == null) return "invalid_key_teams_null";
+
         if (dateTimeString != null && LIVE_TIME_PATTERN.matcher(dateTimeString).matches()) {
-            // Para partidos en vivo, la clave de fecha es el día actual para agrupar los que ocurren hoy
             dateComponent = LocalDate.now(ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE);
         } else {
             ZonedDateTime matchTime = DateTimeUtil.parseCustomDateTime(dateTimeString);
@@ -117,107 +216,144 @@ public class MatchDataService {
             } else if (eventTimestamp != null) {
                 dateComponent = eventTimestamp.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
             } else {
-                dateComponent = "unknown_date"; // Fallback
+                dateComponent = "unknown_date";
             }
         }
         return teamHome.toLowerCase() + "|" + teamAway.toLowerCase() + "|" + dateComponent;
     }
 
-    // Determina el estado basado principalmente en el formato de dateTimeString
     private MatchStatus determineStatusFromDateTimeString(String dateTimeString, ZonedDateTime eventTimestampForFallback) {
         if (dateTimeString != null && LIVE_TIME_PATTERN.matcher(dateTimeString).matches()) {
             return MatchStatus.LIVE;
         }
 
-        ZonedDateTime now = ZonedDateTime.now();
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime matchStartTime = DateTimeUtil.parseCustomDateTime(dateTimeString);
 
-        if (matchStartTime == null && eventTimestampForFallback != null) {
-            logger.debug("Usando eventTimestamp ({}) como fallback para determinar estado (dateTimeString: '{}' no es formato LIVE ni fecha parseable)", eventTimestampForFallback, dateTimeString);
-            // Si usamos eventTimestamp como fallback, es probable que sea histórico si ya pasó
-            return eventTimestampForFallback.isBefore(now) ? MatchStatus.HISTORICAL : MatchStatus.UPCOMING;
-        } else if (matchStartTime == null) {
-            logger.warn("No se pudo determinar la hora del partido (dateTimeString: '{}', eventTimestamp: {}), clasificando como HISTORICAL.", dateTimeString, eventTimestampForFallback);
-            return MatchStatus.HISTORICAL;
+        if (matchStartTime == null) {
+            if (eventTimestampForFallback != null) {
+                return eventTimestampForFallback.isBefore(now) ? MatchStatus.HISTORICAL : MatchStatus.UPCOMING;
+            }
+            return MatchStatus.SCHEDULED;
         }
 
-        // Si se pudo parsear dateTimeString a una fecha/hora concreta
         if (now.isBefore(matchStartTime)) {
             return MatchStatus.UPCOMING;
         } else {
-            // Si la hora actual es después de la hora de inicio parseada, y no es formato LIVE, es HISTORICAL
             return MatchStatus.HISTORICAL;
+        }
+    }
+
+    private synchronized boolean updateOrAddEventInCache(MatchEvent eventData) {
+        String matchKey = generateMatchKey(eventData.getTeamHome(), eventData.getTeamAway(), eventData.getDateTimeString(), eventData.getTimeStamp());
+
+        Optional<MatchEvent> existingEventOpt = matchEventsCache.stream()
+                .filter(e -> matchKey.equals(generateMatchKey(e.getTeamHome(), e.getTeamAway(), e.getDateTimeString(), e.getTimeStamp())))
+                .findFirst();
+
+        if (existingEventOpt.isPresent()) {
+            MatchEvent existingEvent = existingEventOpt.get();
+            boolean changed = false;
+            if (existingEvent.getOddsDraw() != eventData.getOddsDraw()) { existingEvent.setOddsDraw(eventData.getOddsDraw()); changed = true; }
+            if (existingEvent.getOddsHome() != eventData.getOddsHome()) { existingEvent.setOddsHome(eventData.getOddsHome()); changed = true; }
+            if (existingEvent.getOddsAway() != eventData.getOddsAway()) { existingEvent.setOddsAway(eventData.getOddsAway()); changed = true; }
+            if (existingEvent.getMatchStatus() != eventData.getMatchStatus()) { existingEvent.setMatchStatus(eventData.getMatchStatus()); changed = true; }
+            if (!Objects.equals(existingEvent.getLiveTimeDisplay(), eventData.getLiveTimeDisplay())) { existingEvent.setLiveTimeDisplay(eventData.getLiveTimeDisplay()); changed = true; }
+
+            // Solo actualiza dateTimeString si el estado no es LIVE, para evitar sobreescribir el tiempo de juego con una fecha.
+            if (eventData.getMatchStatus() != MatchStatus.LIVE && !Objects.equals(existingEvent.getDateTimeString(), eventData.getDateTimeString())) {
+                // existingEvent.setDateTimeString(eventData.getDateTimeString()); // Comentado por riesgo de cambiar la clave.
+                changed = true; // Pero indica que hubo una diferencia.
+            }
+
+            existingEvent.setSource(eventData.getSource());
+            if (!Objects.equals(existingEvent.getHomeTeamLogoUrl(), eventData.getHomeTeamLogoUrl())) { existingEvent.setHomeTeamLogoUrl(eventData.getHomeTeamLogoUrl()); changed = true; }
+            if (!Objects.equals(existingEvent.getAwayTeamLogoUrl(), eventData.getAwayTeamLogoUrl())) { existingEvent.setAwayTeamLogoUrl(eventData.getAwayTeamLogoUrl()); changed = true; }
+
+            if (changed) {
+                logger.info("Match updated in cache (Source: {}): {} vs {} - Status: {}, OddsH: {}",
+                        eventData.getSource(), existingEvent.getTeamHome(), existingEvent.getTeamAway(), existingEvent.getMatchStatus(), existingEvent.getOddsHome());
+            }
+            return changed;
+        } else {
+            matchEventsCache.add(eventData);
+            logger.info("New match added to cache (Source: {}): {} vs {} - Status: {}, OddsH: {}",
+                    eventData.getSource(), eventData.getTeamHome(), eventData.getTeamAway(), eventData.getMatchStatus(), eventData.getOddsHome());
+            return true;
         }
     }
 
     public synchronized void processRealtimeEvent(MatchEvent eventDataFromMQ) {
         MatchStatus determinedStatus = determineStatusFromDateTimeString(eventDataFromMQ.getDateTimeString(), eventDataFromMQ.getTimeStamp());
         eventDataFromMQ.setMatchStatus(determinedStatus);
-
         if (determinedStatus == MatchStatus.LIVE) {
-            eventDataFromMQ.setLiveTimeDisplay(eventDataFromMQ.getDateTimeString()); // El string ya es "XX'"
+            eventDataFromMQ.setLiveTimeDisplay(eventDataFromMQ.getDateTimeString());
         } else {
             eventDataFromMQ.setLiveTimeDisplay(null);
         }
 
-        String matchKey = generateMatchKey(eventDataFromMQ.getTeamHome(), eventDataFromMQ.getTeamAway(), eventDataFromMQ.getDateTimeString(), eventDataFromMQ.getTimeStamp());
-
-        Optional<MatchEvent> existingEventOpt = matchEventsCache.stream()
-                .filter(e -> generateMatchKey(e.getTeamHome(), e.getTeamAway(), e.getDateTimeString(), e.getTimeStamp()).equals(matchKey))
-                .findFirst();
-
-        if (existingEventOpt.isPresent()) {
-            MatchEvent existingEvent = existingEventOpt.get();
-            existingEvent.setOddsDraw(eventDataFromMQ.getOddsDraw());
-            existingEvent.setOddsHome(eventDataFromMQ.getOddsHome());
-            existingEvent.setOddsAway(eventDataFromMQ.getOddsAway());
-            existingEvent.setMatchStatus(determinedStatus);
-            existingEvent.setLiveTimeDisplay(eventDataFromMQ.getLiveTimeDisplay());
-            existingEvent.setSource(eventDataFromMQ.getSource()); // Actualizar fuente si viene de MQ_LIVE
-            logger.info("Partido actualizado en caché (MQ): {} vs {} - Estado: {}, Display: {}",
-                    existingEvent.getTeamHome(), existingEvent.getTeamAway(), existingEvent.getMatchStatus(),
-                    existingEvent.getMatchStatus() == MatchStatus.LIVE ? existingEvent.getLiveTimeDisplay() : existingEvent.getDateTimeString());
-        } else {
-            matchEventsCache.add(eventDataFromMQ);
-            logger.info("Nuevo partido añadido a caché (MQ): {} vs {} - Estado: {}, Display: {}",
-                    eventDataFromMQ.getTeamHome(), eventDataFromMQ.getTeamAway(), eventDataFromMQ.getMatchStatus(),
-                    eventDataFromMQ.getMatchStatus() == MatchStatus.LIVE ? eventDataFromMQ.getLiveTimeDisplay() : eventDataFromMQ.getDateTimeString());
+        if (eventDataFromMQ.getHomeTeamLogoUrl() == null && eventDataFromMQ.getTeamHome() != null) {
+            eventDataFromMQ.setHomeTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamHome()));
         }
+        if (eventDataFromMQ.getAwayTeamLogoUrl() == null && eventDataFromMQ.getTeamAway() != null) {
+            eventDataFromMQ.setAwayTeamLogoUrl(generateLogoUrlFromName(eventDataFromMQ.getTeamAway()));
+        }
+
+        updateOrAddEventInCache(eventDataFromMQ);
+        // El SSE update se maneja centralizadamente en el MatchTopicListener después de procesar el lote,
+        // o en pollDailyDatalakeFile después de procesar el archivo.
     }
 
     private void refreshMatchStatuses() {
+        boolean changedOverall = false;
         synchronized (this.matchEventsCache) {
-            this.matchEventsCache.forEach(event -> {
+            for (MatchEvent event : this.matchEventsCache) {
+                MatchStatus oldStatus = event.getMatchStatus();
+                String oldLiveDisplay = event.getLiveTimeDisplay();
+
                 MatchStatus newStatus = determineStatusFromDateTimeString(event.getDateTimeString(), event.getTimeStamp());
-                if (event.getMatchStatus() != newStatus) {
-                    logger.debug("Actualizando estado de {} vs {} de {} a {}", event.getTeamHome(), event.getTeamAway(), event.getMatchStatus(), newStatus);
+                if (oldStatus != newStatus) {
                     event.setMatchStatus(newStatus);
+                    changedOverall = true;
                 }
+
                 if (newStatus == MatchStatus.LIVE) {
-                    event.setLiveTimeDisplay(event.getDateTimeString()); // Asegurar que el display es el correcto
+                    if (event.getDateTimeString() != null && LIVE_TIME_PATTERN.matcher(event.getDateTimeString()).matches()) {
+                        if (!event.getDateTimeString().equals(oldLiveDisplay)) {
+                            event.setLiveTimeDisplay(event.getDateTimeString());
+                            changedOverall = true;
+                        }
+                    } else if (oldLiveDisplay == null) {
+                        event.setLiveTimeDisplay("En Vivo"); // Placeholder si no hay tiempo específico
+                        changedOverall = true;
+                    }
                 } else {
-                    event.setLiveTimeDisplay(null); // Limpiar si ya no está en vivo
+                    if (oldLiveDisplay != null) {
+                        event.setLiveTimeDisplay(null);
+                        changedOverall = true;
+                    }
                 }
-            });
+            }
+        }
+        if (changedOverall) {
+            logger.debug("Match statuses refreshed, potential changes detected.");
         }
     }
 
     public List<MatchEvent> getLiveMatches() {
-        refreshMatchStatuses(); // Actualizar estados antes de filtrar
+        refreshMatchStatuses();
         synchronized (this.matchEventsCache) {
-            List<MatchEvent> liveMatches = matchEventsCache.stream()
+            return matchEventsCache.stream()
                     .filter(event -> event.getMatchStatus() == MatchStatus.LIVE)
                     .collect(Collectors.toList());
-            logger.info("getLiveMatches() - Encontrados: {} partidos EN VIVO de {} en caché", liveMatches.size(), matchEventsCache.size());
-            return liveMatches;
         }
     }
 
     public List<MatchEvent> getUpcomingMatches() {
         refreshMatchStatuses();
         synchronized (this.matchEventsCache) {
-            List<MatchEvent> upcomingMatches = matchEventsCache.stream()
-                    .filter(event -> event.getMatchStatus() == MatchStatus.UPCOMING)
+            return matchEventsCache.stream()
+                    .filter(event -> event.getMatchStatus() == MatchStatus.UPCOMING || event.getMatchStatus() == MatchStatus.SCHEDULED)
                     .sorted((e1, e2) -> {
                         ZonedDateTime dt1 = DateTimeUtil.parseCustomDateTime(e1.getDateTimeString());
                         ZonedDateTime dt2 = DateTimeUtil.parseCustomDateTime(e2.getDateTimeString());
@@ -227,15 +363,13 @@ public class MatchDataService {
                         return dt1.compareTo(dt2);
                     })
                     .collect(Collectors.toList());
-            logger.info("getUpcomingMatches() - Encontrados: {} partidos PRÓXIMOS de {} en caché", upcomingMatches.size(), matchEventsCache.size());
-            return upcomingMatches;
         }
     }
 
     public List<MatchEvent> getHistoricalMatches() {
         refreshMatchStatuses();
         synchronized (this.matchEventsCache) {
-            List<MatchEvent> historicalMatches = matchEventsCache.stream()
+            return matchEventsCache.stream()
                     .filter(event -> event.getMatchStatus() == MatchStatus.HISTORICAL)
                     .sorted((e1, e2) -> {
                         ZonedDateTime dt1 = DateTimeUtil.parseCustomDateTime(e1.getDateTimeString());
@@ -246,8 +380,6 @@ public class MatchDataService {
                         return dt2.compareTo(dt1);
                     })
                     .collect(Collectors.toList());
-            logger.info("getHistoricalMatches() - Encontrados: {} partidos HISTÓRICOS de {} en caché", historicalMatches.size(), matchEventsCache.size());
-            return historicalMatches;
         }
     }
     public List<MatchEvent> getAllMatchEvents() {
@@ -258,8 +390,8 @@ public class MatchDataService {
     }
 
     public Optional<MatchEvent> getMatchEventById(String id) {
-        if (id == null) return Optional.empty();
-        refreshMatchStatuses(); // Asegurar que el estado está actualizado
+        if (id == null || id.trim().isEmpty()) return Optional.empty();
+        refreshMatchStatuses();
         synchronized (this.matchEventsCache) {
             return matchEventsCache.stream()
                     .filter(event -> id.equals(event.getId()))
