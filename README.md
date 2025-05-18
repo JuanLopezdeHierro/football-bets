@@ -127,25 +127,25 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 
 Se muestra la interacción entre los componentes principales dentro del módulo business-unit:
 
-   *El cliente interactúa con los REST_Endpoints (definidos en MatchController).
-   *El MatchController utiliza MatchDataService para la lógica de negocio y datos, y ThymeleafEngine para la representación.
-   *MatchDataService es central, manejando la caché (DataMart lógico), el polling, la fusión, y la interacción con MatchSseService para las actualizaciones en tiempo real.
-   *El JavaScript del cliente maneja los eventos SSE recibidos de MatchSseService.
+   * El cliente interactúa con los REST_Endpoints (definidos en MatchController).
+   * El MatchController utiliza MatchDataService para la lógica de negocio y datos, y ThymeleafEngine para la representación.
+   * MatchDataService es central, manejando la caché (DataMart lógico), el polling, la fusión, y la interacción con MatchSseService para las actualizaciones en tiempo real.
+   * El JavaScript del cliente maneja los eventos SSE recibidos de MatchSseService.
    
 ## 7. Principios y Patrones de Diseño Aplicados
-   *Arquitectura en Capas (implícita): Presentación (Controlador, Thymeleaf, JS), Servicio (MatchDataService, MatchSseService), Dominio (Modelos Java), Acceso a Datos (adaptado a archivos).
-   *Inyección de Dependencias (Spring): Usado para gestionar y conectar componentes (@Service, @Controller, @Autowired).
-   *Single Responsibility Principle (SRP):
-   *MatchController: Manejo de peticiones web.
-   *MatchDataService: Lógica de datos, fusión, caché, polling y escritura del DataMart.
-   *MatchSseService: Comunicación SSE.
-   *EventReceivers (en event-store): Responsabilidad única de persistir datos de un tópico JMS al datalake.
-   *Feeders (en módulo feeders): Responsabilidad de obtener datos externos y publicarlos.
-   *Patrón Observador (SSE): El frontend se suscribe a eventos del backend.
-   *Patrón DTO: MatchEventDTO y MatchApiDataDTO para la transferencia de datos desde las fuentes JSON.
-   *Programación Orientada a Eventos (parcial): Con SSE y la respuesta a cambios en el datalake.
-   *Tareas Programadas (@Scheduled): Para el polling periódico y desacoplado del datalake.
-   *Normalización de Datos: Aplicada en MatchDataService para la fusión consistente de nombres de equipos.
-   *Caché en Memoria: Usada en MatchDataService para un acceso rápido a los datos fusionados.
-   *Desacoplamiento (con ActiveMQ): El broker de mensajería desacopla los productores de datos (feeders) de los consumidores iniciales (event-store).
-   *DataMart: La caché matchEventsCache y el archivo YYYYMMDD.datamart.json actúan como un DataMart, proporcionando una vista consolidada y procesada de los datos para la aplicación.
+   * Arquitectura en Capas (implícita): Presentación (Controlador, Thymeleaf, JS), Servicio (MatchDataService, MatchSseService), Dominio (Modelos Java), Acceso a Datos (adaptado a archivos).
+   * Inyección de Dependencias (Spring): Usado para gestionar y conectar componentes (@Service, @Controller, @Autowired).
+   * Single Responsibility Principle (SRP):
+   * MatchController: Manejo de peticiones web.
+   * MatchDataService: Lógica de datos, fusión, caché, polling y escritura del DataMart.
+   * MatchSseService: Comunicación SSE.
+   * EventReceivers (en event-store): Responsabilidad única de persistir datos de un tópico JMS al datalake.
+   * Feeders (en módulo feeders): Responsabilidad de obtener datos externos y publicarlos.
+   * Patrón Observador (SSE): El frontend se suscribe a eventos del backend.
+   * Patrón DTO: MatchEventDTO y MatchApiDataDTO para la transferencia de datos desde las fuentes JSON.
+   * Programación Orientada a Eventos (parcial): Con SSE y la respuesta a cambios en el datalake.
+   * Tareas Programadas (@Scheduled): Para el polling periódico y desacoplado del datalake.
+   * Normalización de Datos: Aplicada en MatchDataService para la fusión consistente de nombres de equipos.
+   * Caché en Memoria: Usada en MatchDataService para un acceso rápido a los datos fusionados.
+   * Desacoplamiento (con ActiveMQ): El broker de mensajería desacopla los productores de datos (feeders) de los consumidores iniciales (event-store).
+   * DataMart: La caché matchEventsCache y el archivo YYYYMMDD.datamart.json actúan como un DataMart, proporcionando una vista consolidada y procesada de los datos para la aplicación.
