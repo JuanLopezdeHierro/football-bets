@@ -74,15 +74,6 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 
     * **c. Módulo `business-unit` (Aplicación Principal):**
         * Este es el módulo que hemos estado desarrollando, contiene la lógica de negocio, el DataMart en memoria y la interfaz web.
-        * Desde la raíz de este módulo, compila si es necesario:
-            ```bash
-            mvn clean package
-            ```
-        * Ejecuta la aplicación:
-            ```bash
-            java -jar target/business-unit-1.0-SNAPSHOT.jar 
-            ```
-            (Reemplaza `business-unit-1.0-SNAPSHOT.jar` con el nombre real de tu JAR).
 
 3.  **Acceder a la Aplicación Web:**
     * Abre tu navegador web.
