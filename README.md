@@ -50,3 +50,28 @@ Ofrecer a aficionados y apostadores una plataforma clara, actualizada automátic
 ```bash
 cd business-unit
 mvn clean package
+
+graph LR
+    subgraph Datalake
+        A1[Match_Topic.events]
+        A2[MatchApi_Topic.events]
+    end
+
+    subgraph SpringBootApp
+        B1[MatchController]
+        B2[MatchDataService]
+        B3[MatchSseService]
+        B4[MatchTopicListener (opcional)]
+        B5[output_datamart.json]
+    end
+
+    User[Usuario] --> Browser
+    Browser -->|HTTP| B1
+    Browser -->|SSE| B3
+    B1 --> B2
+    B2 --> A1
+    B2 --> A2
+    B2 --> B5
+    B2 --> B3
+    B4 --> B2
+
