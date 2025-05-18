@@ -101,6 +101,7 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
 ## 5. Arquitectura
 
 ### 5.1. Diagrama de Arquitectura del Sistema
+![image](https://github.com/user-attachments/assets/9d70f075-e036-4111-8b73-f0dfc8040b62)
 
 
 ### 5.2 Descripción del Diagrama de Sistema:
@@ -116,8 +117,6 @@ La elección de un sistema de archivos como "datalake" y una caché en memoria c
    * MatchSseService: Permite a los clientes (navegadores) suscribirse a actualizaciones. Cuando MatchDataService actualiza su caché, notifica a este servicio para enviar los nuevos datos a los clientes.
    * Output DataMart (Sistema de Archivos): Almacena el archivo .datamart.json generado.
    * Navegador del Usuario: Interactúa con la aplicación, recibe el HTML inicial y luego actualizaciones en tiempo real vía SSE.
-
-5.3. Diagrama de Arquitectura de la Aplicación (Módulo business-unit)
 
 ## 6. Descripción del Diagrama de Aplicación:
 
